@@ -1,5 +1,5 @@
 -- Main.lua (Premium Direct Boss Warp, Modern Language Pack & Clean F9 Console)
-local SCRIPT_URL = "https://raw.githubusercontent.com/discounthee-sys/Zenith-Soul-hub/refs/heads/main/Main.lua"
+local SCRIPT_URL = "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"
 local DISCORD_LINK = "https://discord.gg/AtvaNuz38e"
 
 -- ============================================================
