@@ -8,7 +8,7 @@
 วิธีดึงไปใช้ (สำหรับคนอื่นที่หยิบไลบรารีนี้ไปทำฮับของตัวเอง):
 
     local Solar = loadstring(game:HttpGet(
-        "https://raw.githubusercontent.com/discounthee-sys/Zenith-Soul-hub/refs/heads/main/Solar.lua"
+        "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"
     ))()
 
     local Window = Solar.CreateWindow({
