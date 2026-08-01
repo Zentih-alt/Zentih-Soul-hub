@@ -1,7 +1,7 @@
 -- เทส
 local Solar = nil
 local Success, Error = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/discounthee-sys/Zenith-Soul-hub/refs/heads/main/Solar.lua"))()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"))()
 end)
 
 if not Success then
