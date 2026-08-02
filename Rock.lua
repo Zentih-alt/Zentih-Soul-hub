@@ -95,6 +95,9 @@ local Str = {
         SectionMultiFarm = "Multi Target",
         MultiMonsterLabel = "Select Mobs",
         StartMultiFarm = "Start Multi Farm",
+
+        FarmDragonBall = "Farm Dragon Ball",
+        FarmBox = "Farm Box",
         
         Boss = "Select Boss",
         Summon = "Summon",
@@ -167,6 +170,9 @@ local Str = {
         SectionMultiFarm = "ออโต้ฟาร์มสลับเกาะ",
         MultiMonsterLabel = "เลือกมอนสเตอร์",
         StartMultiFarm = "เปิดออโต้ฟาร์มมอนสลับเกาะ",
+
+        FarmDragonBall = "ฟาร์มดราก้อนบอล",
+        FarmBox = "ฟาร์มกล่อง",
         
         Boss = "เลือกบอส",
         Summon = "เสกบอส",
@@ -202,7 +208,7 @@ local Str = {
         SectionAntiKick = "ระบบป้องกัน AFK",
         AutoRejoin = "เชื่อมต่อใหม่เมื่อหลุด",
         UpdateLogTitle = "บันทึกอัปเดต",
-        UpdateLogDesc = "อัปเดตแผนที่ใหม่ มอนสเตอร์ใหม่ และดันเจี้ยนอัตโนมัติ",
+        UpdateLogDesc = "อัปเดตแผนที่ใหม่ มอนสเตอร์ใหม่ ฟาร์มกล่อง/ดราก้อนบอล และระบบล็อก CFrame บน Heartbeat",
         TabDungeon = "ดันเจี้ยน",
         SectionDungeon = "ระบบลงดันเจี้ยนอัตโนมัติ",
         EnableDungeon = "เปิดออโต้ลงดันเจี้ยน"
@@ -261,7 +267,7 @@ local function refreshDropdown(dropdown, newList)
     end
 end
 
--- ดึงข้อมูล UI Library พร้อมระบบป้องกัน Error (Safeguard)
+-- ดึงข้อมูล UI Library
 local Solar = nil
 local successSolar, errSolar = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/discounthee-sys/Zenith-Soul-hub/refs/heads/main/Solar.lua"))()
@@ -430,25 +436,26 @@ end, "SelectedMonster")
 local FarmEnabledState = false
 local MultiFarmEnabledState = false
 local EventFarmEnabledState = false
+local FarmDragonBallState = false
+local FarmBoxState = false
 local DungeonActiveState = false
+
 local dungeonTargetMob = nil
+local dragonBallTargetMob = nil
+local boxTargetMob = nil
 
 local SelectedBoss = "GooGooGaaGaa"
 local AutoBossFarmState = false
 
-local farmToggleObj, multiFarmToggleObj, eventFarmToggleObj
+local farmToggleObj, multiFarmToggleObj, eventFarmToggleObj, dragonBallToggleObj, boxToggleObj
 
 farmToggleObj = TabFarmPlay:AddToggle(L.StartFarm, "", function(state)
     FarmEnabledState = state
     if state then
-        if MultiFarmEnabledState then
-            MultiFarmEnabledState = false
-            if multiFarmToggleObj then multiFarmToggleObj:Set(false) end
-        end
-        if EventFarmEnabledState then
-            EventFarmEnabledState = false
-            if eventFarmToggleObj then eventFarmToggleObj:Set(false) end
-        end
+        if MultiFarmEnabledState then MultiFarmEnabledState = false if multiFarmToggleObj then multiFarmToggleObj:Set(false) end end
+        if EventFarmEnabledState then EventFarmEnabledState = false if eventFarmToggleObj then eventFarmToggleObj:Set(false) end end
+        if FarmDragonBallState then FarmDragonBallState = false if dragonBallToggleObj then dragonBallToggleObj:Set(false) end end
+        if FarmBoxState then FarmBoxState = false if boxToggleObj then boxToggleObj:Set(false) end end
     end
 end, "FarmEnabledState")
 
@@ -462,19 +469,38 @@ end, "SelectedMultiMonsters")
 multiFarmToggleObj = TabFarmPlay:AddToggle(L.StartMultiFarm, "", function(state)
     MultiFarmEnabledState = state
     if state then
-        if FarmEnabledState then
-            FarmEnabledState = false
-            if farmToggleObj then farmToggleObj:Set(false) end
-        end
-        if EventFarmEnabledState then
-            EventFarmEnabledState = false
-            if eventFarmToggleObj then eventFarmToggleObj:Set(false) end
-        end
+        if FarmEnabledState then FarmEnabledState = false if farmToggleObj then farmToggleObj:Set(false) end end
+        if EventFarmEnabledState then EventFarmEnabledState = false if eventFarmToggleObj then eventFarmToggleObj:Set(false) end end
+        if FarmDragonBallState then FarmDragonBallState = false if dragonBallToggleObj then dragonBallToggleObj:Set(false) end end
+        if FarmBoxState then FarmBoxState = false if boxToggleObj then boxToggleObj:Set(false) end end
     end
 end, "MultiFarmEnabledState")
 
+-- ฟังก์ชันเสริมในแท็บฟาร์ม: Dragon Ball & Farm Box
+TabFarmPlay:AddSection("Special Farm Options")
+
+dragonBallToggleObj = TabFarmPlay:AddToggle(L.FarmDragonBall, "", function(state)
+    FarmDragonBallState = state
+    if state then
+        if FarmEnabledState then FarmEnabledState = false if farmToggleObj then farmToggleObj:Set(false) end end
+        if MultiFarmEnabledState then MultiFarmEnabledState = false if multiFarmToggleObj then multiFarmToggleObj:Set(false) end end
+        if EventFarmEnabledState then EventFarmEnabledState = false if eventFarmToggleObj then eventFarmToggleObj:Set(false) end end
+        if FarmBoxState then FarmBoxState = false if boxToggleObj then boxToggleObj:Set(false) end end
+    end
+end, "FarmDragonBallState")
+
+boxToggleObj = TabFarmPlay:AddToggle(L.FarmBox, "", function(state)
+    FarmBoxState = state
+    if state then
+        if FarmEnabledState then FarmEnabledState = false if farmToggleObj then farmToggleObj:Set(false) end end
+        if MultiFarmEnabledState then MultiFarmEnabledState = false if multiFarmToggleObj then multiFarmToggleObj:Set(false) end end
+        if EventFarmEnabledState then EventFarmEnabledState = false if eventFarmToggleObj then eventFarmToggleObj:Set(false) end end
+        if FarmDragonBallState then FarmDragonBallState = false if dragonBallToggleObj then dragonBallToggleObj:Set(false) end end
+    end
+end, "FarmBoxState")
+
 -- ============================================================
--- 2.3 แท็บอีเว้นท์ (อัปเดตลบตัวเก่า ใส่ Bacon Trainer)
+-- แท็บอีเว้นท์
 -- ============================================================
 local TabEvent = Window.AddTab(L.TabEvent, "Farming")
 TabEvent:AddSection(L.TabEvent)
@@ -489,14 +515,10 @@ end, "SelectedEventMonsters")
 eventFarmToggleObj = TabEvent:AddToggle(L.StartEventFarm, "", function(state)
     EventFarmEnabledState = state
     if state then
-        if FarmEnabledState then
-            FarmEnabledState = false
-            if farmToggleObj then farmToggleObj:Set(false) end
-        end
-        if MultiFarmEnabledState then
-            MultiFarmEnabledState = false
-            if multiFarmToggleObj then multiFarmToggleObj:Set(false) end
-        end
+        if FarmEnabledState then FarmEnabledState = false if farmToggleObj then farmToggleObj:Set(false) end end
+        if MultiFarmEnabledState then MultiFarmEnabledState = false if multiFarmToggleObj then multiFarmToggleObj:Set(false) end end
+        if FarmDragonBallState then FarmDragonBallState = false if dragonBallToggleObj then dragonBallToggleObj:Set(false) end end
+        if FarmBoxState then FarmBoxState = false if boxToggleObj then boxToggleObj:Set(false) end end
     end
 end, "EventFarmEnabledState")
 
@@ -561,7 +583,7 @@ for islandName, data in pairs(IslandMonsterMap) do
 end
 
 -- ============================================================
--- ระบบเควส (อัปเดตเพิ่ม NPC_Quest22 -> Bacon Horse)
+-- ระบบเควส
 -- ============================================================
 local QuestMap = {
     ["NPC_Quest1"] = "Bacon", ["NPC_Quest2"] = "Bacon Strong", ["NPC_Quest3"] = "Bacon Traveler",
@@ -782,7 +804,7 @@ local noclipConn = nil
 local function startNoclip()
     if noclipConn then noclipConn:Disconnect() end
     noclipConn = RunService.Stepped:Connect(function()
-        if not (FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState) then
+        if not (FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState) then
             if noclipConn then noclipConn:Disconnect() noclipConn = nil end
             return
         end
@@ -796,29 +818,60 @@ local function startNoclip()
     table.insert(connections, noclipConn)
 end
 
-local function manageMovers(hrp, enable, targetCFrame)
-    if enable then
-        local bv = hrp:FindFirstChild("ZenithSoul_BV") or Instance.new("BodyVelocity")
-        bv.Name = "ZenithSoul_BV"
-        bv.Velocity = Vector3.new(0, 0, 0)
-        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        bv.Parent = hrp
+-- ============================================================
+-- 🚀 Heartbeat Physics Lock (ระบบวาร์ปล็อก CFrame นิ่งแบบฟิสิกส์ล้างแรง)
+-- ============================================================
+local activeTargetHrp = nil
 
-        local bg = hrp:FindFirstChild("ZenithSoul_BG") or Instance.new("BodyGyro")
-        bg.Name = "ZenithSoul_BG"
-        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        if targetCFrame then bg.CFrame = targetCFrame end
-        bg.Parent = hrp
-    else
-        local bv = hrp:FindFirstChild("ZenithSoul_BV")
-        if bv then bv:Destroy() end
-        local bg = hrp:FindFirstChild("ZenithSoul_BG")
-        if bg then bg:Destroy() end
+local heartbeatConn = RunService.Heartbeat:Connect(function()
+    if _G.ZenithSoul_Session ~= mySession then return end
+    
+    local isFarmActive = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState
+    if not isFarmActive then
+        activeTargetHrp = nil
+        return
     end
-end
+
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not (hrp and hum and hum.Health > 0) then return end
+
+    if activeTargetHrp and activeTargetHrp.Parent and activeTargetHrp.Parent:FindFirstChildOfClass("Humanoid") and activeTargetHrp.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
+        local targetPos = activeTargetHrp.Position
+        local goalCFrame
+        
+        if FarmAngleState == "Above" or FarmAngleState == "บน" then
+            local myPos = targetPos + Vector3.new(0, FarmDistanceState or 10, 0)
+            goalCFrame = getStableLookAt(myPos, targetPos)
+        elseif FarmAngleState == "Below" or FarmAngleState == "ล่าง" then
+            local myPos = targetPos - Vector3.new(0, FarmDistanceState or 10, 0)
+            goalCFrame = getStableLookAt(myPos, targetPos)
+        else
+            local offset = CFrame.new(0, 0, FarmDistanceState or 10)
+            local targetRotation = activeTargetHrp.CFrame - activeTargetHrp.CFrame.Position
+            goalCFrame = CFrame.new(targetPos) * targetRotation * offset
+        end
+
+        hum.PlatformStand = true
+        hrp.CFrame = goalCFrame
+        
+        -- ล้างแรงฟิสิกส์กันการตก/แกว่ง
+        pcall(function()
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end)
+
+        local platform = getOrCreatePlatform()
+        platform.CFrame = goalCFrame * CFrame.new(0, -3.5, 0)
+    else
+        activeTargetHrp = nil
+    end
+end)
+registerConn(heartbeatConn)
 
 -- ============================================================
--- ระบบคำนวณเป้าหมายและลูปโจมตีมอนสเตอร์/บอส
+-- ระบบคำนวณเป้าหมายมอนสเตอร์
 -- ============================================================
 local lastTargetName = nil
 local lastTargetInstance = nil
@@ -833,7 +886,7 @@ local questPending = false
 
 local function autoAcceptQuestFor(monsterName)
     if questPending or monsterName == lastAutoQuestTarget then return end
-    if AutoBossFarmState or DungeonActiveState then return end
+    if AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState then return end
     
     local npcName = MobToNPC[monsterName]
     if not npcName then
@@ -864,6 +917,61 @@ local function autoAcceptQuestFor(monsterName)
     end)
 end
 
+-- ฟังก์ชันค้นหา Piccolo ใน BossSpawnGroup
+local function getDragonBallPiccolo()
+    local bsg = workspace:FindFirstChild("BossSpawnGroup")
+    if bsg then
+        for _, obj in ipairs(bsg:GetDescendants()) do
+            if obj:IsA("Model") and (obj.Name == "Piccolo" or string.find(obj.Name, "Piccolo")) then
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                local hrp = obj:FindFirstChild("HumanoidRootPart")
+                if hum and hum.Health > 0 and hrp then
+                    return obj
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- ฟังก์ชันค้นหา Bacon Thief ใน MobSpawnGroup และเปิดกล่อง ChestRef
+local function getBaconThiefMob()
+    local msg = workspace:FindFirstChild("MobSpawnGroup")
+    if msg then
+        for _, obj in ipairs(msg:GetDescendants()) do
+            if obj:IsA("Model") and (obj.Name == "Bacon Thief" or string.find(obj.Name, "Bacon Thief")) then
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                local hrp = obj:FindFirstChild("HumanoidRootPart")
+                if hum and hum.Health > 0 and hrp then
+                    return obj
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function checkAndInteractBox()
+    local msg = workspace:FindFirstChild("MobSpawnGroup")
+    if msg then
+        for _, obj in ipairs(msg:GetDescendants()) do
+            if obj.Name == "ChestRef" or string.find(obj.Name, "Chest") then
+                local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+                if prompt then
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local chestPart = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
+                    if hrp and chestPart then
+                        hrp.CFrame = chestPart.CFrame + Vector3.new(0, 3, 0)
+                        task.wait(0.2)
+                        fireproximityprompt(prompt)
+                    end
+                end
+            end
+        end
+    end
+end
+
 local wasFarming = false
 
 task.spawn(function()
@@ -881,6 +989,7 @@ task.spawn(function()
 
         if currentTool == "None" then
             removePlatform()
+            activeTargetHrp = nil
             continue
         end
 
@@ -946,6 +1055,27 @@ task.spawn(function()
             activeFarm = SelectedBoss
         end
 
+        -- ระบบจัดการเป้าหมายในโหมด Dragon Ball & Box
+        if FarmDragonBallState then
+            local piccolo = getDragonBallPiccolo()
+            if piccolo and piccolo:FindFirstChild("HumanoidRootPart") then
+                activeTargetHrp = piccolo.HumanoidRootPart
+                wasFarming = true
+                if not noclipConn then startNoclip() end
+                continue
+            end
+        elseif FarmBoxState then
+            local thief = getBaconThiefMob()
+            if thief and thief:FindFirstChild("HumanoidRootPart") then
+                activeTargetHrp = thief.HumanoidRootPart
+                wasFarming = true
+                if not noclipConn then startNoclip() end
+                continue
+            else
+                checkAndInteractBox()
+            end
+        end
+
         if activeFarm then
             wasFarming = true
             if not noclipConn then startNoclip() end
@@ -956,58 +1086,19 @@ task.spawn(function()
             end
 
             pcall(function()
-                local char = player.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                
-                if hrp and hum and hum.Health > 0 then
-                    teleportToIsland(activeFarm)
-                    
-                    local target = getTargetMobByName(activeFarm)
-                    if target and target:FindFirstChild("HumanoidRootPart") then
-                        local targetHrp = target:FindFirstChild("HumanoidRootPart")
-                        if targetHrp then
-                            local platform = getOrCreatePlatform()
-                            hum.PlatformStand = true
-                            
-                            local targetPos = targetHrp.Position
-                            local goalCFrame
-                            
-                            if FarmAngleState == "Above" or FarmAngleState == "บน" then
-                                local myPos = targetPos + Vector3.new(0, FarmDistanceState, 0)
-                                goalCFrame = getStableLookAt(myPos, targetPos)
-                            elseif FarmAngleState == "Below" or FarmAngleState == "ล่าง" then
-                                local myPos = targetPos - Vector3.new(0, FarmDistanceState, 0)
-                                goalCFrame = getStableLookAt(myPos, targetPos)
-                            else
-                                local offset = CFrame.new(0, 0, FarmDistanceState)
-                                local targetRotation = targetHrp.CFrame - targetHrp.CFrame.Position
-                                goalCFrame = CFrame.new(targetPos) * targetRotation * offset
-                            end
-                            
-                            platform.CFrame = goalCFrame * CFrame.new(0, -3.5, 0)
-
-                            hrp.CFrame = goalCFrame
-                            hrp.Velocity = Vector3.new(0, 0, 0)
-                            hrp.RotVelocity = Vector3.new(0, 0, 0)
-                        end
-                    else
-                        if hum then hum.PlatformStand = false end
-                        manageMovers(hrp, false)
-                        removePlatform()
-                        
-                        local uprightLook = hrp.CFrame.LookVector
-                        uprightLook = Vector3.new(uprightLook.X, 0, uprightLook.Z)
-                        if uprightLook.Magnitude < 0.01 then uprightLook = Vector3.new(0, 0, 1) end
-                        hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + uprightLook)
-                        hrp.Velocity = Vector3.new(0, 0, 0)
-                        hrp.RotVelocity = Vector3.new(0, 0, 0)
-                    end
+                teleportToIsland(activeFarm)
+                local target = getTargetMobByName(activeFarm)
+                if target and target:FindFirstChild("HumanoidRootPart") then
+                    activeTargetHrp = target.HumanoidRootPart
+                else
+                    activeTargetHrp = nil
+                    removePlatform()
                 end
             end)
         else
-            if wasFarming and not DungeonActiveState then
+            if wasFarming and not (DungeonActiveState or FarmDragonBallState or FarmBoxState) then
                 wasFarming = false
+                activeTargetHrp = nil
                 pcall(function()
                     local char = player.Character
                     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1016,9 +1107,8 @@ task.spawn(function()
                     if noclipConn then noclipConn:Disconnect() noclipConn = nil end
                     if hum then hum.PlatformStand = false end
                     if hrp then
-                        manageMovers(hrp, false)
-                        hrp.Velocity = Vector3.new(0, 0, 0)
-                        hrp.RotVelocity = Vector3.new(0, 0, 0)
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
                     end
                     if char then
                         for _, part in ipairs(char:GetChildren()) do
@@ -1038,28 +1128,12 @@ end)
 -- ============================================================
 local function runSkillBurst()
     pcall(function()
-        local activeName = nil
-        if FarmEnabledState then
-            activeName = SelectedMonster
-        elseif MultiFarmEnabledState then
-            activeName = lastTargetName
-        elseif EventFarmEnabledState then
-            activeName = lastTargetName
-        elseif AutoBossFarmState then
-            activeName = SelectedBoss
-        end
-
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        if DungeonActiveState and dungeonTargetMob and dungeonTargetMob:FindFirstChild("HumanoidRootPart") then
-            if (hrp.Position - dungeonTargetMob.HumanoidRootPart.Position).Magnitude > 60 then return end
-        else
-            if not activeName then return end
-            local mobTarget = getTargetMobByName(activeName)
-            if not (mobTarget and mobTarget:FindFirstChild("HumanoidRootPart")) then return end
-            if (hrp.Position - mobTarget.HumanoidRootPart.Position).Magnitude > 60 then return end
+        if activeTargetHrp then
+            if (hrp.Position - activeTargetHrp.Position).Magnitude > 60 then return end
         end
 
         local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes", 5)
@@ -1108,7 +1182,7 @@ task.spawn(function()
         task.wait(0.08)
         if tick() < suppressAttackUntil then continue end
 
-        local isAttackingMode = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState
+        local isAttackingMode = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState
 
         if SelectedTool ~= "None" and isAttackingMode then
             pcall(function()
@@ -1217,7 +1291,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- CATEGORY: Dungeon (ระบบออโต้ลงดันเจี้ยนใหม่)
+-- CATEGORY: Dungeon (ระบบออโต้ลงดันเจี้ยน + เช็กดันก่อนวาร์ป + Auto Skip)
 -- ============================================================
 local TabDungeon = Window.AddTab(L.TabDungeon, "Dungeon")
 TabDungeon:AddSection(L.SectionDungeon)
@@ -1250,6 +1324,26 @@ local function getNearbyDungeonMob(radius)
     return closestMob
 end
 
+-- ฟังก์ชัน Auto Skip Wave
+local function checkAndAutoSkip()
+    pcall(function()
+        local pGui = player:FindFirstChild("PlayerGui")
+        if pGui then
+            for _, gui in ipairs(pGui:GetChildren()) do
+                if gui:IsA("ScreenGui") then
+                    for _, btn in ipairs(gui:GetDescendants()) do
+                        if btn:IsA("TextButton") or btn:IsA("ImageButton") then
+                            if string.find(string.lower(btn.Name), "skip") or (btn:IsA("TextButton") and string.find(string.lower(btn.Text), "skip")) then
+                                firebutton1click(btn)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
 local function startDungeonLoop()
     if dungeonRunning then return end
     dungeonRunning = true
@@ -1257,66 +1351,62 @@ local function startDungeonLoop()
     task.spawn(function()
         while _G.ZenithSoul_Session == mySession and DungeonActiveState do
             pcall(function()
-                Window.Notify({Title = "Dungeon", Description = "กำลังเดินทางไปเปิดดันเจี้ยน...", Duration = 3})
+                local dungeonMap = workspace:FindFirstChild("DungeonMap")
+                local insideDungeonAlready = dungeonMap and (#dungeonMap:GetChildren() > 0)
 
-                local npcPromptFolder = workspace:FindFirstChild("NpcPrompt")
-                local openDungeonNpc = npcPromptFolder and npcPromptFolder:FindFirstChild("Open Dungeon")
-                
-                if openDungeonNpc then
-                    local char = player.Character
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local npcPart = openDungeonNpc:IsA("BasePart") and openDungeonNpc or openDungeonNpc:FindFirstChildWhichIsA("BasePart", true)
-                        if npcPart then
-                            hrp.CFrame = npcPart.CFrame + Vector3.new(0, 3, 0)
-                            task.wait(0.5)
+                -- เช็กก่อน หากอยู่ในดันเจี้ยนอยู่แล้ว จะไม่สั่งวาร์ปออกไปเปิดดันใหม่
+                if not insideDungeonAlready then
+                    Window.Notify({Title = "Dungeon", Description = "กำลังเดินทางไปเปิดดันเจี้ยน...", Duration = 3})
 
-                            local prompt = openDungeonNpc:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt then
-                                fireproximityprompt(prompt)
+                    local npcPromptFolder = workspace:FindFirstChild("NpcPrompt")
+                    local openDungeonNpc = npcPromptFolder and npcPromptFolder:FindFirstChild("Open Dungeon")
+                    
+                    if openDungeonNpc then
+                        local char = player.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            local npcPart = openDungeonNpc:IsA("BasePart") and openDungeonNpc or openDungeonNpc:FindFirstChildWhichIsA("BasePart", true)
+                            if npcPart then
+                                hrp.CFrame = npcPart.CFrame + Vector3.new(0, 3, 0)
+                                task.wait(0.5)
+
+                                local prompt = openDungeonNpc:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt then
+                                    fireproximityprompt(prompt)
+                                end
                             end
                         end
                     end
+
+                    task.wait(0.5)
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local targetCFrame = CFrame.new(124.15, 24.52, 183.81)
+                        hrp.CFrame = targetCFrame
+                        local platform = getOrCreatePlatform()
+                        platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+                    end
+
+                    Window.Notify({Title = "Dungeon", Description = "รอระบบสร้างดันเจี้ยน 17 วินาที...", Duration = 3})
+                    task.wait(17)
+                    dungeonMap = workspace:FindFirstChild("DungeonMap")
                 end
 
-                task.wait(0.5)
-                local char = player.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local targetCFrame = CFrame.new(124.15, 24.52, 183.81)
-                    hrp.CFrame = targetCFrame
-                    local platform = getOrCreatePlatform()
-                    platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
-                end
-
-                Window.Notify({Title = "Dungeon", Description = "รอระบบสร้างดันเจี้ยน 17 วินาที...", Duration = 3})
-                task.wait(17)
-
-                local dungeonMap = workspace:FindFirstChild("DungeonMap")
                 local hasDungeon = dungeonMap and (#dungeonMap:GetChildren() > 0)
 
                 if hasDungeon then
                     Window.Notify({Title = "Dungeon", Description = "เข้าสู่ดันเจี้ยนสำเร็จ! เริ่มทำการฟาร์ม", Duration = 3})
 
                     while _G.ZenithSoul_Session == mySession and DungeonActiveState and dungeonMap and #dungeonMap:GetChildren() > 0 do
+                        checkAndAutoSkip() -- เรียก Auto Skip ทุกครั้งในลูป
                         local mob = getNearbyDungeonMob(300)
                         dungeonTargetMob = mob
 
-                        if mob and mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChildOfClass("Humanoid") then
-                            local hum = char:FindFirstChildOfClass("Humanoid")
-                            local mobHrp = mob.HumanoidRootPart
-                            if hum and hrp then
-                                hum.PlatformStand = true
-                                local platform = getOrCreatePlatform()
-                                local myPos = mobHrp.Position + Vector3.new(0, FarmDistanceState or 10, 0)
-                                local goalCFrame = getStableLookAt(myPos, mobHrp.Position)
-
-                                platform.CFrame = goalCFrame * CFrame.new(0, -3.5, 0)
-                                hrp.CFrame = goalCFrame
-                                hrp.Velocity = Vector3.new(0, 0, 0)
-                            end
+                        if mob and mob:FindFirstChild("HumanoidRootPart") then
+                            activeTargetHrp = mob.HumanoidRootPart
                         else
-                            dungeonTargetMob = nil
+                            activeTargetHrp = nil
                             removePlatform()
                         end
                         task.wait(0.1)
@@ -1328,6 +1418,7 @@ local function startDungeonLoop()
             end)
             task.wait(2)
         end
+        activeTargetHrp = nil
         dungeonTargetMob = nil
         dungeonRunning = false
         removePlatform()
@@ -1339,6 +1430,7 @@ TabDungeon:AddToggle(L.EnableDungeon, "", function(state)
     if state then
         startDungeonLoop()
     else
+        activeTargetHrp = nil
         dungeonTargetMob = nil
         removePlatform()
     end
@@ -1537,7 +1629,7 @@ end, "AutoRejoinEnabled")
 task.spawn(function()
     while _G.ZenithSoul_Session == mySession do
         task.wait(90)
-        if AutoRejoinEnabled then
+        if AutoRejoinEnabled me then
             pcall(function()
                 local vu = game:GetService("VirtualUser")
                 vu:CaptureController()
