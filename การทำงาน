@@ -1,0 +1,78 @@
+-- ============================================================
+-- 🚀 Heartbeat Physics Lock (Above Angle) Module
+-- ============================================================
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ⚙️ ตัวแปรควบคุม (ปรับแต่งตามสคริปต์หลักของคุณได้เลย)
+local Settings = {
+    AutoFarm = true,             -- เปิด/ปิด การฟาร์ม
+    TargetMonster = "Bacon Trainer", -- ชื่อมอนสเตอร์เป้าหมาย
+    Distance = 8,                 -- ระยะสูงเหนือหัวมอน (Studs)
+    AutoAttack = true             -- เปิด/ปิด ตีอัตโนมัติ
+}
+
+-- 1. ฟังก์ชันค้นหามอนสเตอร์
+local function getTargetMob()
+    local mobFolder = workspace:FindFirstChild("Mob") or workspace
+    for _, mob in ipairs(mobFolder:GetChildren()) do
+        if mob.Name == Settings.TargetMonster then
+            local hum = mob:FindFirstChildOfClass("Humanoid")
+            local hrp = mob:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and hrp then
+                return mob
+            end
+        end
+    end
+    return nil
+end
+
+-- 2. ระบบวาร์ปล็อกตำแหน่งบน Heartbeat (ลอยนิ่งเหนือหัว)
+RunService.Heartbeat:Connect(function()
+    if not Settings.AutoFarm then return end
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if not (hrp and hum and hum.Health > 0) then return end
+
+    local mob = getTargetMob()
+    if mob and mob:FindFirstChild("HumanoidRootPart") then
+        local targetHrp = mob.HumanoidRootPart
+        
+        -- คำนวณพิกัด Above (ลอยเหนือหัว + หันหน้ามองลงมาที่มอน)
+        local targetPos = targetHrp.Position
+        local abovePos = targetPos + Vector3.new(0, Settings.Distance, 0)
+        local goalCFrame = CFrame.lookAt(abovePos, targetPos)
+        
+        -- ล็อก CFrame + ล้างแรงฟิสิกส์
+        hrp.CFrame = goalCFrame
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end
+end)
+
+-- 3. ระบบ Auto Attack (ถืออาวุธและฟันอัตโนมัติ)
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        if Settings.AutoFarm and Settings.AutoAttack then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local tool = char:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+                    if tool then
+                        if tool.Parent ~= char then
+                            char.Humanoid:EquipTool(tool)
+                        end
+                        tool:Activate()
+                    end
+                end
+            end)
+        end
+    end
+end)
