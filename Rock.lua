@@ -1,4 +1,4 @@
--- Main.lua (Premium Direct Boss Warp, Modern Language Pack & Clean F9 Console)
+-- Main.lua (Zenith Soul Hub - Modern Language & Clean System)
 local SCRIPT_URL = "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Rock.lua"
 local DISCORD_LINK = "https://discord.gg/AtvaNuz38e"
 
@@ -45,7 +45,7 @@ local player = game.Players.LocalPlayer
 player:WaitForChild("Backpack", 10)
 
 -- ============================================================
--- ระบบภาษาปรับปรุงใหม่ (ไทยสมัยใหม่ & กระชับสั้นที่สุด ไม่สุภาพเกินไป)
+-- ระบบภาษาปรับปรุงใหม่
 -- ============================================================
 local currentLang = "Thai"
 pcall(function()
@@ -132,8 +132,8 @@ local Str = {
         UpdateLogTitle = "Updates",
         UpdateLogDesc = "Map Updates & Improvements.",
         TabDungeon = "Dungeon",
-        SectionDungeon = "GoMoon Dungeon",
-        EnableDungeon = "Enable Dungeon"
+        SectionDungeon = "Auto Dungeon Map",
+        EnableDungeon = "Enable Auto Dungeon"
     },
     Thai = {
         Subtitle = "Rock Fruit",
@@ -202,10 +202,10 @@ local Str = {
         SectionAntiKick = "ระบบป้องกัน AFK",
         AutoRejoin = "เชื่อมต่อใหม่เมื่อหลุด",
         UpdateLogTitle = "บันทึกอัปเดต",
-        UpdateLogDesc = "อัปเดตแผนที่ใหม่และปรับปรุงระบบบอส",
+        UpdateLogDesc = "อัปเดตแผนที่ใหม่ มอนสเตอร์ใหม่ และดันเจี้ยนอัตโนมัติ",
         TabDungeon = "ดันเจี้ยน",
-        SectionDungeon = "ดัน GoMoon",
-        EnableDungeon = "เปิดดันเจี้ยน"
+        SectionDungeon = "ระบบลงดันเจี้ยนอัตโนมัติ",
+        EnableDungeon = "เปิดออโต้ลงดันเจี้ยน"
     }
 }
 
@@ -261,10 +261,18 @@ local function refreshDropdown(dropdown, newList)
     end
 end
 
--- ดึงข้อมูล UI Library
-local Solar = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"
-))()
+-- ดึงข้อมูล UI Library พร้อมระบบป้องกัน Error (Safeguard)
+local Solar = nil
+local successSolar, errSolar = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/discounthee-sys/Zenith-Soul-hub/refs/heads/main/Solar.lua"))()
+end)
+
+if successSolar and Solar then
+    Solar = errSolar
+else
+    -- สำรอง UI เผื่อลิงก์หลักมีปัญหา
+    Solar = loadstring(game:HttpGet("https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"))()
+end
 
 local Window = Solar.CreateWindow({
     Title = "Zenith Soul",
@@ -274,9 +282,10 @@ local Window = Solar.CreateWindow({
     ToggleIcon = "rbxassetid://94329205103503"
 })
 
--- ใส่ความโปร่งแสงให้ ContentBG ในวงกลมเขียวทันทีหลังเปิดตัว UI
 pcall(function()
-    Window.SetTransparency(UI_TRANSPARENCY)
+    if Window.SetTransparency then
+        Window.SetTransparency(0.2)
+    end
 end)
 
 -- ============================================================
@@ -407,11 +416,13 @@ local TabFarmPlay = Window.AddTab(L.TabFarmPlay, "Farming")
 TabFarmPlay:AddSection(L.SectionSelectMonster)
 
 local SelectedMonster = "Bacon"
+-- อัปเดตเพิ่ม Bacon Horse เข้าลิสต์มอนสเตอร์ปกติ
 local MonsterList = {
     "Bacon", "Bacon Strong", "Duck Monster", "Bacon Traveler", "Bacon Fawkes", "Bacon Pirate",
     "Bacon Clown", "Bacon Tarzan", "Gorilla", "Bacon Fisherman", "Bacon The Deep",
     "Bacon Marine", "Bacon Marine Captain", "Bacon Iron", "Bacon Rock", "Bacon Minerals",
-    "Bacon Kryptonite", "Bacon Snow", "Bacon Ice", "Bacon Lava", "Bacon Hellfire", "Bacon Shadow Garden"
+    "Bacon Kryptonite", "Bacon Snow", "Bacon Ice", "Bacon Lava", "Bacon Hellfire", "Bacon Shadow Garden",
+    "Bacon Horse"
 }
 
 TabFarmPlay:AddDropdown(L.SelectMonsterLabel, "", MonsterList, "Bacon", function(v)
@@ -421,9 +432,9 @@ end, "SelectedMonster")
 local FarmEnabledState = false
 local MultiFarmEnabledState = false
 local EventFarmEnabledState = false
+local DungeonActiveState = false
+local dungeonTargetMob = nil
 
--- ประกาศล่วงหน้าตรงนี้ (ก่อนลูปฟามหลักด้านล่าง) เพราะลูปฟามหลัก/ระบบสกิล/ลูปสวิงตี อ้างอิงตัวแปรพวกนี้
--- ถ้าไปประกาศ local ทีหลังในแท็บบอส ลูปที่นิยามไว้ก่อนหน้าจะมองว่าเป็นตัวแปร global (nil) แทน ทำให้เสกบอสติดแต่ไม่เข้าไปตี
 local SelectedBoss = "GooGooGaaGaa"
 local AutoBossFarmState = false
 
@@ -465,12 +476,12 @@ multiFarmToggleObj = TabFarmPlay:AddToggle(L.StartMultiFarm, "", function(state)
 end, "MultiFarmEnabledState")
 
 -- ============================================================
--- 2.3 แท็บอีเว้นท์
+-- 2.3 แท็บอีเว้นท์ (อัปเดตลบตัวเก่า ใส่ Bacon Trainer)
 -- ============================================================
 local TabEvent = Window.AddTab(L.TabEvent, "Farming")
 TabEvent:AddSection(L.TabEvent)
 
-local EventMonsterList = {"Bacon Seinen"}
+local EventMonsterList = {"Bacon Trainer"}
 
 local SelectedEventMonsters = {}
 local EventDropdown = TabEvent:AddMultiDropdown(L.EventMonsterLabel, "", EventMonsterList, {}, function(v)
@@ -492,10 +503,9 @@ eventFarmToggleObj = TabEvent:AddToggle(L.StartEventFarm, "", function(state)
 end, "EventFarmEnabledState")
 
 -- ============================================================
--- 👾 ระบบหาพิกัดและวาร์ปบอสตรงตัว (Warp Directly to Boss Directory)
+-- 👾 ระบบหาพิกัดและวาร์ปบอสตรงตัว
 -- ============================================================
 local function getBossModel(bossName)
-    -- บอสอยู่ที่ workspace.Boss[ชื่อบอส] ตรงๆ (เช่น workspace.Boss.GooGooGaaGaa) ใช้วิธีเดียวกับที่ระบบฟามมอนปกติหามอนใน workspace.Mob
     local bossFolder = workspace:FindFirstChild("Boss")
     if bossFolder then
         local boss = bossFolder:FindFirstChild(bossName)
@@ -541,7 +551,7 @@ local IslandMonsterMap = {
     ["Crystal island"] = { index = 47, monsters = {"Bacon Minerals", "Bacon Kryptonite"} },
     ["Snow island"] = { index = 1, monsters = {"Bacon Snow", "Bacon Ice"} },
     ["Lava island"] = { index = 1, monsters = {"Bacon Lava", "Bacon Hellfire"} },
-    ["Event Island"] = { index = 34, monsters = {"Bacon Seinen"} },
+    ["Event Island"] = { index = 34, monsters = {"Bacon Trainer"} },
     ["Boss island"] = { index = 1, monsters = {"GooGooGaaGaa", "Dark Bacon"} }
 }
 
@@ -553,7 +563,7 @@ for islandName, data in pairs(IslandMonsterMap) do
 end
 
 -- ============================================================
--- ระบบเควส
+-- ระบบเควส (อัปเดตเพิ่ม NPC_Quest22 -> Bacon Horse)
 -- ============================================================
 local QuestMap = {
     ["NPC_Quest1"] = "Bacon", ["NPC_Quest2"] = "Bacon Strong", ["NPC_Quest3"] = "Bacon Traveler",
@@ -564,6 +574,7 @@ local QuestMap = {
     ["NPC_Quest16"] = "Bacon Kryptonite", ["NPC_Quest17"] = "Bacon Snow", ["NPC_Quest18"] = "Bacon Ice",
     ["NPC_Quest19"] = "Bacon Lava", ["NPC_Quest20"] = "Bacon Hellfire",
     ["NPC_Quest21"] = "Bacon Shadow Garden",
+    ["NPC_Quest22"] = "Bacon Horse"
 }
 
 local MobToNPC = {}
@@ -604,7 +615,7 @@ local function resolveTargetPart(monsterName)
 
     local npcName = MobToNPC[monsterName]
     if npcName then
-        local npc = workspace:FindFirstChild(npcName, true)
+        local npc = workspace:FindFirstChild("NpcQuest") and workspace.NpcQuest:FindFirstChild(npcName) or workspace:FindFirstChild(npcName, true)
         if npc then
             local npcPart = npc:IsA("BasePart") and npc or npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChildWhichIsA("BasePart", true)
             if npcPart then
@@ -622,7 +633,6 @@ local function teleportToIsland(monsterName)
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        -- ฟังก์ชันแก้บั๊กบอสไม่ตี: เมื่อตรวจพบบอส Dark Bacon หรือ GooGooGaaGaa เกิดขึ้นใน workspace.Boss สั่งวาร์ปตัวละครลอยประจันหน้าโดยตรงทันที!
         local targetMob = getTargetMobByName(monsterName)
         if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
             local targetHrp = targetMob:FindFirstChild("HumanoidRootPart")
@@ -685,7 +695,12 @@ local function acceptQuest(npcName)
     hum.PlatformStand = true
     local npc = nil
     for i = 1, 30 do
-        npc = workspace:FindFirstChild(npcName, true)
+        if workspace:FindFirstChild("NpcQuest") then
+            npc = workspace.NpcQuest:FindFirstChild(npcName)
+        end
+        if not npc then
+            npc = workspace:FindFirstChild(npcName, true)
+        end
         if npc then break end
         task.wait(0.1)
     end
@@ -769,7 +784,7 @@ local noclipConn = nil
 local function startNoclip()
     if noclipConn then noclipConn:Disconnect() end
     noclipConn = RunService.Stepped:Connect(function()
-        if not (FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState) then
+        if not (FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState) then
             if noclipConn then noclipConn:Disconnect() noclipConn = nil end
             return
         end
@@ -820,7 +835,7 @@ local questPending = false
 
 local function autoAcceptQuestFor(monsterName)
     if questPending or monsterName == lastAutoQuestTarget then return end
-    if AutoBossFarmState then return end
+    if AutoBossFarmState or DungeonActiveState then return end
     
     local npcName = MobToNPC[monsterName]
     if not npcName then
@@ -993,7 +1008,7 @@ task.spawn(function()
                 end
             end)
         else
-            if wasFarming then
+            if wasFarming and not DungeonActiveState then
                 wasFarming = false
                 pcall(function()
                     local char = player.Character
@@ -1035,14 +1050,19 @@ local function runSkillBurst()
         elseif AutoBossFarmState then
             activeName = SelectedBoss
         end
-        if not activeName then return end
-
-        local mobTarget = getTargetMobByName(activeName)
-        if not (mobTarget and mobTarget:FindFirstChild("HumanoidRootPart")) then return end
 
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not (hrp and (hrp.Position - mobTarget.HumanoidRootPart.Position).Magnitude < 60) then return end
+        if not hrp then return end
+
+        if DungeonActiveState and dungeonTargetMob and dungeonTargetMob:FindFirstChild("HumanoidRootPart") then
+            if (hrp.Position - dungeonTargetMob.HumanoidRootPart.Position).Magnitude > 60 then return end
+        else
+            if not activeName then return end
+            local mobTarget = getTargetMobByName(activeName)
+            if not (mobTarget and mobTarget:FindFirstChild("HumanoidRootPart")) then return end
+            if (hrp.Position - mobTarget.HumanoidRootPart.Position).Magnitude > 60 then return end
+        end
 
         local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes", 5)
         local actionRemote = remotes and remotes:WaitForChild("Action", 5)
@@ -1090,7 +1110,7 @@ task.spawn(function()
         task.wait(0.08)
         if tick() < suppressAttackUntil then continue end
 
-        local isAttackingMode = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState
+        local isAttackingMode = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState
 
         if SelectedTool ~= "None" and isAttackingMode then
             pcall(function()
@@ -1134,7 +1154,7 @@ local function equipSelectedTool(char)
 end
 
 local charAddedConn = player.CharacterAdded:Connect(function(newChar)
-    if _G.ZenithSoul_Session ~= mySession then return end
+    if _G.ZenithSoul_Session ~= mySession sinister then return end
     task.wait(1.5)
     
     local cAddedSub = newChar.ChildAdded:Connect(function(child)
@@ -1169,7 +1189,6 @@ local TabSummonBoss = Window.AddTab(L.TabSummonBoss, "Bosses")
 TabSummonBoss:AddSection(L.SectionSummon)
 
 local BossNameList = {"GooGooGaaGaa", "Dark Bacon"}
--- SelectedBoss กับ AutoBossFarmState ประกาศไว้ล่วงหน้าแล้วก่อนลูปฟามหลัก (เพื่อไม่ให้ลูปที่นิยามไว้ก่อนแท็บนี้อ่านค่าเป็น global nil)
 
 TabSummonBoss:AddDropdown("Boss", "", BossNameList, SelectedBoss, function(v)
     SelectedBoss = v
@@ -1179,7 +1198,6 @@ TabSummonBoss:AddToggle(L.AutoSummon, L.AutoSummonDesc, function(state)
     AutoBossFarmState = state
 end, "AutoBossFarmState")
 
--- ลูปออโต้เสกบอส (ตีทำในลูปฟาร์มหลัก/ลูปสวิงที่ใช้ AutoBossFarmState ตัวเดียวกัน)
 task.spawn(function()
     while _G.ZenithSoul_Session == mySession do
         task.wait(1.5)
@@ -1201,78 +1219,138 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- CATEGORY: Dungeon (ดัน GoMoon)
+-- CATEGORY: Dungeon (ระบบออโต้ลงดันเจี้ยนใหม่)
 -- ============================================================
 local TabDungeon = Window.AddTab(L.TabDungeon, "Dungeon")
 TabDungeon:AddSection(L.SectionDungeon)
 
--- DungeonActiveState คือสวิตช์เดียวคุมทั้งระบบ (เซฟ/โหลดผ่านชื่อ flag "DungeonActiveState" เหมือนสวิตช์อื่นๆ ในสคริปต์)
-local DungeonActiveState = false
 local dungeonRunning = false
 
--- สแกนหา folder/model ชื่อ mod หรือ boss ทั่ว workspace (ใช้ตอนยังไม่รู้ path ตายตัวของแมพดัน)
-local function findDungeonModBoss()
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        local lname = string.lower(obj.Name)
-        if lname == "mod" or lname == "boss" then
-            return obj
+-- ฟังก์ชันค้นหามอนสเตอร์รอบตัวในระยะ 300 Studs (สำหรับดันเจี้ยน)
+local function getNearbyDungeonMob(radius)
+    radius = radius or 300
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local closestMob = nil
+    local minDistance = radius
+
+    local mobFolder = workspace:FindFirstChild("Mob") or workspace
+    for _, mob in ipairs(mobFolder:GetChildren()) do
+        if mob:IsA("Model") and mob:FindFirstChildOfClass("Humanoid") and mob:FindFirstChild("HumanoidRootPart") then
+            local hum = mob:FindFirstChildOfClass("Humanoid")
+            local mHrp = mob.HumanoidRootPart
+            if hum.Health > 0 and mob.Name ~= player.Name then
+                local dist = (hrp.Position - mHrp.Position).Magnitude
+                if dist < minDistance then
+                    minDistance = dist
+                    closestMob = mob
+                end
+            end
         end
     end
-    return nil
+    return closestMob
 end
 
--- ลูปหลักของดันเจี้ยน: กด GoMoon แบบเดียวกับรับเควส -> รอเจอ workspace.Ocean (ถือว่าเข้าดันแล้ว) -> ไปยืนจุดที่กำหนด -> หา mod/boss
-local function runGoMoonDungeon()
+-- ลูปการทำงานระบบดันเจี้ยนอัตโนมัติ
+local function startDungeonLoop()
     if dungeonRunning then return end
     dungeonRunning = true
 
     task.spawn(function()
-        pcall(function()
-            cancelQuest()
-            local clicked = acceptQuest("GoMoon")
-            if not clicked then return end
+        while _G.ZenithSoul_Session == mySession and DungeonActiveState do
+            pcall(function()
+                Window.Notify({Title = "Dungeon", Description = "กำลังเดินทางไปเปิดดันเจี้ยน...", Duration = 3})
 
-            -- รอเข้าแมพใหม่ ไม่ fix เวลา รอจนกว่าจะเจอ workspace.Ocean เท่านั้น
-            local ocean = nil
-            while _G.ZenithSoul_Session == mySession and DungeonActiveState and not ocean do
-                ocean = workspace:FindFirstChild("Ocean")
-                if ocean then break end
-                task.wait(0.5)
-            end
-
-            if not (ocean and DungeonActiveState) then return end
-
-            -- ยืนตำแหน่งที่ต้องไปก่อนเข้าดันจริง
-            local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = CFrame.new(Vector3.new(37.75, 8.70, -271.88))
-            end
-            task.wait(1)
-
-            -- ค้นหา mod/boss ในแมพดัน
-            local modBoss = findDungeonModBoss()
-            if modBoss then
-                Window.Notify({Title = "Dungeon", Description = "พบบอสในดัน: " .. modBoss.Name .. " กำลังเข้าตี", Duration = 3})
-                -- พบไฟล์บอส -> ใช้ระบบฟามเดิม (getTargetMobByName/teleportToIsland) ไม่สร้างระบบตีซ้ำซ้อน
-                if modBoss:FindFirstChildOfClass("Humanoid") and modBoss:FindFirstChild("HumanoidRootPart") then
-                    local targetHrp = modBoss.HumanoidRootPart
+                -- 1. วาร์ปไปหา workspace.NpcPrompt["Open Dungeon"]
+                local npcPromptFolder = workspace:FindFirstChild("NpcPrompt")
+                local openDungeonNpc = npcPromptFolder and npcPromptFolder:FindFirstChild("Open Dungeon")
+                
+                if openDungeonNpc then
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
                     if hrp then
-                        hrp.CFrame = targetHrp.CFrame + Vector3.new(0, FarmDistanceState or 10, 0)
+                        local npcPart = openDungeonNpc:IsA("BasePart") and openDungeonNpc or openDungeonNpc:FindFirstChildWhichIsA("BasePart", true)
+                        if npcPart then
+                            hrp.CFrame = npcPart.CFrame + Vector3.new(0, 3, 0)
+                            task.wait(0.5)
+
+                            -- กด ProximityPrompt หรือส่ง Remote เปิดดัน
+                            local prompt = openDungeonNpc:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt then
+                                fireproximityprompt(prompt)
+                            end
+                        end
                     end
                 end
-            else
-                Window.Notify({Title = "Dungeon", Description = "ไม่พบไฟล์ mod/boss ในดันนี้", Duration = 3})
-            end
-        end)
+
+                -- 2. วาร์ปไปจุดพักตามพิกัด Vector3.new(124.15, 24.52, 183.81)
+                task.wait(0.5)
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local targetCFrame = CFrame.new(124.15, 24.52, 183.81)
+                    hrp.CFrame = targetCFrame
+                    local platform = getOrCreatePlatform()
+                    platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+                end
+
+                -- 3. รอ 17 วินาที เพื่อให้แมพดันเจี้ยนสร้าง
+                Window.Notify({Title = "Dungeon", Description = "รอระบบสร้างดันเจี้ยน 17 วินาที...", Duration = 3})
+                task.wait(17)
+
+                -- 4. สแกนตรวจสอบใน workspace.DungeonMap
+                local dungeonMap = workspace:FindFirstChild("DungeonMap")
+                local hasDungeon = dungeonMap and (#dungeonMap:GetChildren() > 0)
+
+                if hasDungeon then
+                    Window.Notify({Title = "Dungeon", Description = "เข้าสู่ดันเจี้ยนสำเร็จ! เริ่มทำการฟาร์ม", Duration = 3})
+
+                    -- วนลูปฟาร์มจนกว่าดันเจี้ยนจะจบ (จนกว่าแมพใน DungeonMap จะหายไป)
+                    while _G.ZenithSoul_Session == mySession and DungeonActiveState and dungeonMap and #dungeonMap:GetChildren() > 0 do
+                        local mob = getNearbyDungeonMob(300)
+                        dungeonTargetMob = mob
+
+                        if mob and mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChildOfClass("Humanoid") then
+                            local hum = char:FindFirstChildOfClass("Humanoid")
+                            local mobHrp = mob.HumanoidRootPart
+                            if hum and hrp then
+                                hum.PlatformStand = true
+                                local platform = getOrCreatePlatform()
+                                local myPos = mobHrp.Position + Vector3.new(0, FarmDistanceState or 10, 0)
+                                local goalCFrame = getStableLookAt(myPos, mobHrp.Position)
+
+                                platform.CFrame = goalCFrame * CFrame.new(0, -3.5, 0)
+                                hrp.CFrame = goalCFrame
+                                hrp.Velocity = Vector3.new(0, 0, 0)
+                            end
+                        else
+                            dungeonTargetMob = nil
+                            removePlatform()
+                        end
+                        task.wait(0.1)
+                    end
+                    Window.Notify({Title = "Dungeon", Description = "ดันเจี้ยนจบแล้ว เตรียมเริ่มรอบใหม่...", Duration = 3})
+                else
+                    Window.Notify({Title = "Dungeon", Description = "ไม่พบดันเจี้ยน ลองใหม่อีกครั้ง...", Duration = 3})
+                end
+            end)
+            task.wait(2)
+        end
+        dungeonTargetMob = nil
         dungeonRunning = false
+        removePlatform()
     end)
 end
 
 TabDungeon:AddToggle(L.EnableDungeon, "", function(state)
     DungeonActiveState = state
     if state then
-        runGoMoonDungeon()
+        startDungeonLoop()
+    else
+        dungeonTargetMob = nil
+        removePlatform()
     end
 end, "DungeonActiveState")
 
@@ -1357,8 +1435,6 @@ end)
 
 -- ============================================================
 -- ร้านค้า (Shop) - สุ่มกล่อง
--- หมายเหตุ: ยังไม่รู้ค่าตัวเลือกกล่องสุ่มจริงในเกม เลยใส่เป็นตัวเลือกจำนวน x1/x5/x15/x60
--- ตามตัวอย่าง Remote ที่ส่งมา (RandomItem, "x15") ถ้าเกมใช้ชื่อกล่องจริงๆ บอกมาได้เดี๋ยวเปลี่ยนลิสต์ให้
 -- ============================================================
 TabStatus:AddSection("Shop")
 
@@ -1392,7 +1468,6 @@ end)
 -- CATEGORY: Settings
 -- ============================================================
 
--- Tab 1: General Settings
 local TabGeneral = Window.AddTab(L.TabGeneral, "Settings")
 TabGeneral:AddSection(L.SectionGeneral)
 TabGeneral:AddDropdown(L.Theme, "", {"Black", "White", "GreenBlack", "NeonPurple"}, "Black", function(v)
@@ -1463,7 +1538,7 @@ TabGeneral:AddKeybind(L.ToggleKey, "", Enum.KeyCode.RightShift, function(key)
 end, "ToggleKey")
 
 -- ============================================================
--- กันหลุด / รีจอย (เปิดอัตโนมัติตั้งแต่แรกเริ่มตามที่คุณต้องการ)
+-- กันหลุด / รีจอย
 -- ============================================================
 TabGeneral:AddSection(L.SectionAntiKick)
 
