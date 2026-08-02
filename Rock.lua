@@ -1,5 +1,5 @@
 -- Main.lua (Premium Direct Boss Warp, Modern Language Pack & Clean F9 Console)
-local SCRIPT_URL = "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"
+local SCRIPT_URL = "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Rock.lua"
 local DISCORD_LINK = "https://discord.gg/AtvaNuz38e"
 
 -- ============================================================
@@ -263,7 +263,7 @@ end
 
 -- ดึงข้อมูล UI Library
 local Solar = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/discounthee-sys/Zenith-Soul-hub/refs/heads/main/Solar.lua"
+    "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"
 ))()
 
 local Window = Solar.CreateWindow({
