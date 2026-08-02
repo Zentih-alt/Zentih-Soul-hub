@@ -270,7 +270,6 @@ end)
 if successSolar and Solar then
     Solar = errSolar
 else
-    -- สำรอง UI เผื่อลิงก์หลักมีปัญหา
     Solar = loadstring(game:HttpGet("https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/refs/heads/main/Solar.lua"))()
 end
 
@@ -416,7 +415,6 @@ local TabFarmPlay = Window.AddTab(L.TabFarmPlay, "Farming")
 TabFarmPlay:AddSection(L.SectionSelectMonster)
 
 local SelectedMonster = "Bacon"
--- อัปเดตเพิ่ม Bacon Horse เข้าลิสต์มอนสเตอร์ปกติ
 local MonsterList = {
     "Bacon", "Bacon Strong", "Duck Monster", "Bacon Traveler", "Bacon Fawkes", "Bacon Pirate",
     "Bacon Clown", "Bacon Tarzan", "Gorilla", "Bacon Fisherman", "Bacon The Deep",
@@ -1154,7 +1152,7 @@ local function equipSelectedTool(char)
 end
 
 local charAddedConn = player.CharacterAdded:Connect(function(newChar)
-    if _G.ZenithSoul_Session ~= mySession sinister then return end
+    if _G.ZenithSoul_Session ~= mySession then return end
     task.wait(1.5)
     
     local cAddedSub = newChar.ChildAdded:Connect(function(child)
@@ -1226,7 +1224,6 @@ TabDungeon:AddSection(L.SectionDungeon)
 
 local dungeonRunning = false
 
--- ฟังก์ชันค้นหามอนสเตอร์รอบตัวในระยะ 300 Studs (สำหรับดันเจี้ยน)
 local function getNearbyDungeonMob(radius)
     radius = radius or 300
     local char = player.Character
@@ -1253,7 +1250,6 @@ local function getNearbyDungeonMob(radius)
     return closestMob
 end
 
--- ลูปการทำงานระบบดันเจี้ยนอัตโนมัติ
 local function startDungeonLoop()
     if dungeonRunning then return end
     dungeonRunning = true
@@ -1263,7 +1259,6 @@ local function startDungeonLoop()
             pcall(function()
                 Window.Notify({Title = "Dungeon", Description = "กำลังเดินทางไปเปิดดันเจี้ยน...", Duration = 3})
 
-                -- 1. วาร์ปไปหา workspace.NpcPrompt["Open Dungeon"]
                 local npcPromptFolder = workspace:FindFirstChild("NpcPrompt")
                 local openDungeonNpc = npcPromptFolder and npcPromptFolder:FindFirstChild("Open Dungeon")
                 
@@ -1276,7 +1271,6 @@ local function startDungeonLoop()
                             hrp.CFrame = npcPart.CFrame + Vector3.new(0, 3, 0)
                             task.wait(0.5)
 
-                            -- กด ProximityPrompt หรือส่ง Remote เปิดดัน
                             local prompt = openDungeonNpc:FindFirstChildWhichIsA("ProximityPrompt", true)
                             if prompt then
                                 fireproximityprompt(prompt)
@@ -1285,7 +1279,6 @@ local function startDungeonLoop()
                     end
                 end
 
-                -- 2. วาร์ปไปจุดพักตามพิกัด Vector3.new(124.15, 24.52, 183.81)
                 task.wait(0.5)
                 local char = player.Character
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1296,18 +1289,15 @@ local function startDungeonLoop()
                     platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
                 end
 
-                -- 3. รอ 17 วินาที เพื่อให้แมพดันเจี้ยนสร้าง
                 Window.Notify({Title = "Dungeon", Description = "รอระบบสร้างดันเจี้ยน 17 วินาที...", Duration = 3})
                 task.wait(17)
 
-                -- 4. สแกนตรวจสอบใน workspace.DungeonMap
                 local dungeonMap = workspace:FindFirstChild("DungeonMap")
                 local hasDungeon = dungeonMap and (#dungeonMap:GetChildren() > 0)
 
                 if hasDungeon then
                     Window.Notify({Title = "Dungeon", Description = "เข้าสู่ดันเจี้ยนสำเร็จ! เริ่มทำการฟาร์ม", Duration = 3})
 
-                    -- วนลูปฟาร์มจนกว่าดันเจี้ยนจะจบ (จนกว่าแมพใน DungeonMap จะหายไป)
                     while _G.ZenithSoul_Session == mySession and DungeonActiveState and dungeonMap and #dungeonMap:GetChildren() > 0 do
                         local mob = getNearbyDungeonMob(300)
                         dungeonTargetMob = mob
@@ -1358,7 +1348,6 @@ end, "DungeonActiveState")
 -- CATEGORY: Progression (เควส & อัพสเตตัส)
 -- ============================================================
 
--- Tab 1: เทเลพอร์ต NPC รับเควสแมนนวล
 local TabTeleportNPC = Window.AddTab(L.TabTeleportNPC, "Progression")
 TabTeleportNPC:AddSection(L.SectionQuestNPC)
 
@@ -1385,7 +1374,6 @@ TabTeleportNPC:AddButton(L.TeleportAndAccept, function()
     end
 end)
 
--- Tab 2: อัพสเตตัส
 local TabStatus = Window.AddTab(L.TabStatus, "Progression")
 TabStatus:AddSection(L.SectionStatUpgrade)
 
@@ -1491,7 +1479,6 @@ end, "SelectedLanguage")
 
 TabGeneral:AddSection(L.SectionDisplay)
 
--- ระบบจอดำ (Black Screen)
 local SafeParent = player:FindFirstChild("PlayerGui")
 pcall(function() if game:GetService("CoreGui") then SafeParent = game:GetService("CoreGui") end end)
 
