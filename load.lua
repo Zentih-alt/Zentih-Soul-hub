@@ -1,4 +1,4 @@
--- Protected by Mnx Obfuscator | Public Enemy
+
 local d9y0WBhPmH=tostring(21)
 local tZ8SUpZtXlhtqay00k=183
 local dW10CdVaH=type(nil)
