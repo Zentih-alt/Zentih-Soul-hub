@@ -208,7 +208,7 @@ local Str = {
         SectionAntiKick = "ระบบป้องกัน AFK",
         AutoRejoin = "เชื่อมต่อใหม่เมื่อหลุด",
         UpdateLogTitle = "บันทึกอัปเดต",
-        UpdateLogDesc = "อัปเดตแผนที่ใหม่ มอนสเตอร์ใหม่ ฟาร์มกล่อง/ดราก้อนบอล และระบบล็อก CFrame บน Heartbeat",
+        UpdateLogDesc = "อัปเดตแผนที่ใหม่ มอนสเตอร์ใหม่ แก้ไขบั๊กรับเควสและปรับแต่งระบบฟาร์มกล่อง",
         TabDungeon = "ดันเจี้ยน",
         SectionDungeon = "ระบบลงดันเจี้ยนอัตโนมัติ",
         EnableDungeon = "เปิดออโต้ลงดันเจี้ยน"
@@ -283,7 +283,7 @@ local Window = Solar.CreateWindow({
     Title = "Zenith Soul",
     Subtitle = L.Subtitle,
     Theme = "Black",
-    Icon = "rbxassetid://70537126163494",
+    Icon = "rbxassetid://136354895694655",
     ToggleIcon = "rbxassetid://94329205103503"
 })
 
@@ -441,9 +441,6 @@ local FarmBoxState = false
 local DungeonActiveState = false
 
 local dungeonTargetMob = nil
-local dragonBallTargetMob = nil
-local boxTargetMob = nil
-
 local SelectedBoss = "GooGooGaaGaa"
 local AutoBossFarmState = false
 
@@ -476,7 +473,7 @@ multiFarmToggleObj = TabFarmPlay:AddToggle(L.StartMultiFarm, "", function(state)
     end
 end, "MultiFarmEnabledState")
 
--- ฟังก์ชันเสริมในแท็บฟาร์ม: Dragon Ball & Farm Box
+-- ฟังก์ชันเสริมในแท็บฟาร์ม
 TabFarmPlay:AddSection("Special Farm Options")
 
 dragonBallToggleObj = TabFarmPlay:AddToggle(L.FarmDragonBall, "", function(state)
@@ -583,7 +580,7 @@ for islandName, data in pairs(IslandMonsterMap) do
 end
 
 -- ============================================================
--- ระบบเควส
+-- ระบบเควส (อัปเดตเพิ่ม NPC_Quest22 -> Bacon Horse)
 -- ============================================================
 local QuestMap = {
     ["NPC_Quest1"] = "Bacon", ["NPC_Quest2"] = "Bacon Strong", ["NPC_Quest3"] = "Bacon Traveler",
@@ -714,7 +711,7 @@ local function acceptQuest(npcName)
     
     hum.PlatformStand = true
     local npc = nil
-    for i = 1, 30 do
+    for i = 1, 15 do
         if workspace:FindFirstChild("NpcQuest") then
             npc = workspace.NpcQuest:FindFirstChild(npcName)
         end
@@ -730,7 +727,7 @@ local function acceptQuest(npcName)
         return false 
     end
     
-    for attempt = 1, 6 do
+    for attempt = 1, 4 do
         local success, result = pcall(function()
             if not npc.Parent then return false end
             local npcPart = npc:IsA("BasePart") and npc or npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChildWhichIsA("BasePart", true)
@@ -738,7 +735,7 @@ local function acceptQuest(npcName)
                 hrp.CFrame = CFrame.lookAt(npcPart.Position + (npcPart.CFrame.LookVector * 2.8) + Vector3.new(0, 0.5, 0), npcPart.Position)
             end
             
-            task.wait(0.3)
+            task.wait(0.2)
             local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true)
             if prompt then
                 local oldDist = prompt.MaxActivationDistance
@@ -746,15 +743,15 @@ local function acceptQuest(npcName)
                 
                 prompt.MaxActivationDistance = 999999
                 prompt.RequiresLineOfSight = false
-                task.wait(0.1)
+                task.wait(0.05)
                 
-                for clickCount = 1, 3 do
+                for clickCount = 1, 2 do
                     if prompt and prompt.Parent then
                         fireproximityprompt(prompt)
-                        task.wait(0.15)
+                        task.wait(0.1)
                     end
                 end
-                task.wait(0.2)
+                task.wait(0.1)
                 prompt.MaxActivationDistance = oldDist
                 prompt.RequiresLineOfSight = oldRequireLineOfSight
                 return true
@@ -767,7 +764,7 @@ local function acceptQuest(npcName)
             hrp.Velocity = Vector3.new(0, 0, 0)
             return true
         end
-        task.wait(0.4)
+        task.wait(0.2)
     end
     
     hum.PlatformStand = false
@@ -781,7 +778,7 @@ local function cancelQuest()
             and game:GetService("ReplicatedStorage").Modules.NetworkFramework:FindFirstChild("NetworkEvent")
         if netEvent then
             netEvent:FireServer("fire", nil, "Quest", "Cancel")
-            task.wait(0.5)
+            task.wait(0.3)
         end
     end)
 end
@@ -819,7 +816,7 @@ local function startNoclip()
 end
 
 -- ============================================================
--- 🚀 Heartbeat Physics Lock (ระบบวาร์ปล็อก CFrame นิ่งแบบฟิสิกส์ล้างแรง)
+-- 🚀 Heartbeat Physics Lock (ปรับมุมการตี + ระยะห่างแบบ Real-time)
 -- ============================================================
 local activeTargetHrp = nil
 
@@ -840,15 +837,18 @@ local heartbeatConn = RunService.Heartbeat:Connect(function()
     if activeTargetHrp and activeTargetHrp.Parent and activeTargetHrp.Parent:FindFirstChildOfClass("Humanoid") and activeTargetHrp.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
         local targetPos = activeTargetHrp.Position
         local goalCFrame
+        local distVal = FarmDistanceState or 10
         
-        if FarmAngleState == "Above" or FarmAngleState == "บน" then
-            local myPos = targetPos + Vector3.new(0, FarmDistanceState or 10, 0)
+        -- รองรับการปรับมุมตีทั้งภาษาไทยและอังกฤษ
+        if FarmAngleState == "Above" or FarmAngleState == "ด้านบน" or FarmAngleState == "บน" then
+            local myPos = targetPos + Vector3.new(0, distVal, 0)
             goalCFrame = getStableLookAt(myPos, targetPos)
-        elseif FarmAngleState == "Below" or FarmAngleState == "ล่าง" then
-            local myPos = targetPos - Vector3.new(0, FarmDistanceState or 10, 0)
+        elseif FarmAngleState == "Below" or FarmAngleState == "ด้านล่าง" or FarmAngleState == "ล่าง" then
+            local myPos = targetPos - Vector3.new(0, distVal, 0)
             goalCFrame = getStableLookAt(myPos, targetPos)
         else
-            local offset = CFrame.new(0, 0, FarmDistanceState or 10)
+            -- Default: Behind / ข้างหลัง
+            local offset = CFrame.new(0, 0, distVal)
             local targetRotation = activeTargetHrp.CFrame - activeTargetHrp.CFrame.Position
             goalCFrame = CFrame.new(targetPos) * targetRotation * offset
         end
@@ -856,7 +856,6 @@ local heartbeatConn = RunService.Heartbeat:Connect(function()
         hum.PlatformStand = true
         hrp.CFrame = goalCFrame
         
-        -- ล้างแรงฟิสิกส์กันการตก/แกว่ง
         pcall(function()
             hrp.AssemblyLinearVelocity = Vector3.zero
             hrp.AssemblyAngularVelocity = Vector3.zero
@@ -871,7 +870,7 @@ end)
 registerConn(heartbeatConn)
 
 -- ============================================================
--- ระบบคำนวณเป้าหมายมอนสเตอร์
+-- ระบบคำนวณเป้าหมายมอนสเตอร์ & รับเควส
 -- ============================================================
 local lastTargetName = nil
 local lastTargetInstance = nil
@@ -884,6 +883,7 @@ local comboInProgress = false
 local lastAutoQuestTarget = nil
 local questPending = false
 
+-- แก้ไขฟังก์ชันรับเควสอัตโนมัติให้ทำงานได้อย่างถูกต้อง
 local function autoAcceptQuestFor(monsterName)
     if questPending or monsterName == lastAutoQuestTarget then return end
     if AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState then return end
@@ -892,19 +892,6 @@ local function autoAcceptQuestFor(monsterName)
     if not npcName then
         lastAutoQuestTarget = monsterName
         return
-    end
-
-    local targetPart = resolveTargetPart(monsterName)
-    if targetPart then
-        local char = player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local targetPos = targetPart:IsA("BasePart") and targetPart.Position or (targetPart:FindFirstChildOfClass("BasePart") and targetPart:FindFirstChildOfClass("BasePart").Position)
-            if targetPos then
-                local dist = (hrp.Position - targetPos).Magnitude
-                if dist > 350 then return end
-            end
-        end
     end
 
     questPending = true
@@ -934,7 +921,7 @@ local function getDragonBallPiccolo()
     return nil
 end
 
--- ฟังก์ชันค้นหา Bacon Thief ใน MobSpawnGroup และเปิดกล่อง ChestRef
+-- ฟังก์ชันค้นหา Bacon Thief ใน MobSpawnGroup
 local function getBaconThiefMob()
     local msg = workspace:FindFirstChild("MobSpawnGroup")
     if msg then
@@ -951,7 +938,12 @@ local function getBaconThiefMob()
     return nil
 end
 
+-- แก้ไขฟังก์ชันตรวจหากล่องเพื่อไม่ให้วาร์ปสลับถี่เกินไป
+local lastChestCheckTime = 0
 local function checkAndInteractBox()
+    if tick() - lastChestCheckTime < 1.5 then return end
+    lastChestCheckTime = tick()
+
     local msg = workspace:FindFirstChild("MobSpawnGroup")
     if msg then
         for _, obj in ipairs(msg:GetDescendants()) do
@@ -963,8 +955,10 @@ local function checkAndInteractBox()
                     local chestPart = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
                     if hrp and chestPart then
                         hrp.CFrame = chestPart.CFrame + Vector3.new(0, 3, 0)
-                        task.wait(0.2)
+                        task.wait(0.3)
                         fireproximityprompt(prompt)
+                        task.wait(0.3)
+                        break
                     end
                 end
             end
@@ -1055,7 +1049,7 @@ task.spawn(function()
             activeFarm = SelectedBoss
         end
 
-        -- ระบบจัดการเป้าหมายในโหมด Dragon Ball & Box
+        -- โหมด Dragon Ball
         if FarmDragonBallState then
             local piccolo = getDragonBallPiccolo()
             if piccolo and piccolo:FindFirstChild("HumanoidRootPart") then
@@ -1064,6 +1058,7 @@ task.spawn(function()
                 if not noclipConn then startNoclip() end
                 continue
             end
+        -- โหมด Farm Box
         elseif FarmBoxState then
             local thief = getBaconThiefMob()
             if thief and thief:FindFirstChild("HumanoidRootPart") then
@@ -1072,7 +1067,9 @@ task.spawn(function()
                 if not noclipConn then startNoclip() end
                 continue
             else
+                activeTargetHrp = nil
                 checkAndInteractBox()
+                continue
             end
         end
 
@@ -1629,7 +1626,7 @@ end, "AutoRejoinEnabled")
 task.spawn(function()
     while _G.ZenithSoul_Session == mySession do
         task.wait(90)
-        if AutoRejoinEnabled me then
+        if AutoRejoinEnabled then
             pcall(function()
                 local vu = game:GetService("VirtualUser")
                 vu:CaptureController()
