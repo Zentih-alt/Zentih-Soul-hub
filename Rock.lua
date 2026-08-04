@@ -135,8 +135,10 @@ local Str = {
         UpdateLogTitle = "Updates",
         UpdateLogDesc = "Map Updates & Improvements.",
         TabDungeon = "Dungeon",
-        SectionDungeon = "Auto Dungeon Map",
-        EnableDungeon = "Enable Auto Dungeon"
+        SectionDungeon = "Dungeon Options",
+        EnableDungeon = "Enable Normal Dungeon",
+        SpawnDungeonLevel = "Dungeon Level (1-25)",
+        EnableGoMoonDungeon = "Enable Event Dungeon"
     },
     Thai = {
         Subtitle = "Rock Fruit",
@@ -208,10 +210,12 @@ local Str = {
         SectionAntiKick = "ระบบป้องกัน AFK",
         AutoRejoin = "เชื่อมต่อใหม่เมื่อหลุด",
         UpdateLogTitle = "บันทึกอัปเดต",
-        UpdateLogDesc = "อัปเดตแผนที่ใหม่ มอนสเตอร์ใหม่ แก้ไขบั๊กรับเควสและปรับแต่งระบบฟาร์มกล่อง",
+        UpdateLogDesc = "ปรับเวลาหน่วงเตรียมดันเจี้ยนเป็น 32 วินาที และตั้งค่าให้ดันเจียนอีเว้นท์ตี Bacon Big เป็นตัวสุดท้าย",
         TabDungeon = "ดันเจี้ยน",
         SectionDungeon = "ระบบลงดันเจี้ยนอัตโนมัติ",
-        EnableDungeon = "เปิดออโต้ลงดันเจี้ยน"
+        EnableDungeon = "เปิดดันเจียนปกติ",
+        SpawnDungeonLevel = "เลือกเลขดันเจี้ยน (1 - 25)",
+        EnableGoMoonDungeon = "เปิดดันเจียนอีเว้นท์"
     }
 }
 
@@ -283,7 +287,7 @@ local Window = Solar.CreateWindow({
     Title = "Zenith Soul",
     Subtitle = L.Subtitle,
     Theme = "Black",
-    Icon = "rbxassetid://136354895694655",
+    Icon = "rbxassetid://70537126163494",
     ToggleIcon = "rbxassetid://94329205103503"
 })
 
@@ -439,6 +443,7 @@ local EventFarmEnabledState = false
 local FarmDragonBallState = false
 local FarmBoxState = false
 local DungeonActiveState = false
+local GoMoonDungeonActiveState = false
 
 local dungeonTargetMob = nil
 local SelectedBoss = "GooGooGaaGaa"
@@ -580,7 +585,7 @@ for islandName, data in pairs(IslandMonsterMap) do
 end
 
 -- ============================================================
--- ระบบเควส (อัปเดตเพิ่ม NPC_Quest22 -> Bacon Horse)
+-- ระบบเควส
 -- ============================================================
 local QuestMap = {
     ["NPC_Quest1"] = "Bacon", ["NPC_Quest2"] = "Bacon Strong", ["NPC_Quest3"] = "Bacon Traveler",
@@ -709,7 +714,6 @@ local function acceptQuest(npcName)
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not (hrp and hum) then return false end
     
-    hum.PlatformStand = true
     local npc = nil
     for i = 1, 15 do
         if workspace:FindFirstChild("NpcQuest") then
@@ -723,7 +727,6 @@ local function acceptQuest(npcName)
     end
     
     if not npc then 
-        hum.PlatformStand = false
         return false 
     end
     
@@ -760,14 +763,12 @@ local function acceptQuest(npcName)
         end)
         
         if success and result then
-            hum.PlatformStand = false
             hrp.Velocity = Vector3.new(0, 0, 0)
             return true
         end
         task.wait(0.2)
     end
     
-    hum.PlatformStand = false
     return false
 end
 
@@ -801,7 +802,7 @@ local noclipConn = nil
 local function startNoclip()
     if noclipConn then noclipConn:Disconnect() end
     noclipConn = RunService.Stepped:Connect(function()
-        if not (FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState) then
+        if not (FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or GoMoonDungeonActiveState or FarmDragonBallState or FarmBoxState) then
             if noclipConn then noclipConn:Disconnect() noclipConn = nil end
             return
         end
@@ -816,16 +817,19 @@ local function startNoclip()
 end
 
 -- ============================================================
--- 🚀 Heartbeat Physics Lock (ปรับมุมการตี + ระยะห่างแบบ Real-time)
+-- 🚀 Heartbeat Physics Lock (แก้ตัวละครนอน/ล้ม คืนท่ายืนปกติ)
 -- ============================================================
 local activeTargetHrp = nil
+local lastHoverCFrame = nil
 
 local heartbeatConn = RunService.Heartbeat:Connect(function()
     if _G.ZenithSoul_Session ~= mySession then return end
     
-    local isFarmActive = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState
+    local isFarmActive = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or GoMoonDungeonActiveState or FarmDragonBallState or FarmBoxState
     if not isFarmActive then
         activeTargetHrp = nil
+        lastHoverCFrame = nil
+        removePlatform()
         return
     end
 
@@ -834,12 +838,15 @@ local heartbeatConn = RunService.Heartbeat:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not (hrp and hum and hum.Health > 0) then return end
 
+    if hum.PlatformStand then
+        hum.PlatformStand = false
+    end
+
     if activeTargetHrp and activeTargetHrp.Parent and activeTargetHrp.Parent:FindFirstChildOfClass("Humanoid") and activeTargetHrp.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
         local targetPos = activeTargetHrp.Position
         local goalCFrame
         local distVal = FarmDistanceState or 10
         
-        -- รองรับการปรับมุมตีทั้งภาษาไทยและอังกฤษ
         if FarmAngleState == "Above" or FarmAngleState == "ด้านบน" or FarmAngleState == "บน" then
             local myPos = targetPos + Vector3.new(0, distVal, 0)
             goalCFrame = getStableLookAt(myPos, targetPos)
@@ -847,14 +854,13 @@ local heartbeatConn = RunService.Heartbeat:Connect(function()
             local myPos = targetPos - Vector3.new(0, distVal, 0)
             goalCFrame = getStableLookAt(myPos, targetPos)
         else
-            -- Default: Behind / ข้างหลัง
             local offset = CFrame.new(0, 0, distVal)
             local targetRotation = activeTargetHrp.CFrame - activeTargetHrp.CFrame.Position
             goalCFrame = CFrame.new(targetPos) * targetRotation * offset
         end
 
-        hum.PlatformStand = true
         hrp.CFrame = goalCFrame
+        lastHoverCFrame = goalCFrame
         
         pcall(function()
             hrp.AssemblyLinearVelocity = Vector3.zero
@@ -865,6 +871,15 @@ local heartbeatConn = RunService.Heartbeat:Connect(function()
         platform.CFrame = goalCFrame * CFrame.new(0, -3.5, 0)
     else
         activeTargetHrp = nil
+        if lastHoverCFrame then
+            hrp.CFrame = lastHoverCFrame
+            pcall(function()
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+            end)
+            local platform = getOrCreatePlatform()
+            platform.CFrame = lastHoverCFrame * CFrame.new(0, -3.5, 0)
+        end
     end
 end)
 registerConn(heartbeatConn)
@@ -883,10 +898,9 @@ local comboInProgress = false
 local lastAutoQuestTarget = nil
 local questPending = false
 
--- แก้ไขฟังก์ชันรับเควสอัตโนมัติให้ทำงานได้อย่างถูกต้อง
 local function autoAcceptQuestFor(monsterName)
     if questPending or monsterName == lastAutoQuestTarget then return end
-    if AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState then return end
+    if AutoBossFarmState or DungeonActiveState or GoMoonDungeonActiveState or FarmDragonBallState or FarmBoxState then return end
     
     local npcName = MobToNPC[monsterName]
     if not npcName then
@@ -904,7 +918,6 @@ local function autoAcceptQuestFor(monsterName)
     end)
 end
 
--- ฟังก์ชันค้นหา Piccolo ใน BossSpawnGroup
 local function getDragonBallPiccolo()
     local bsg = workspace:FindFirstChild("BossSpawnGroup")
     if bsg then
@@ -921,7 +934,6 @@ local function getDragonBallPiccolo()
     return nil
 end
 
--- ฟังก์ชันค้นหา Bacon Thief ใน MobSpawnGroup
 local function getBaconThiefMob()
     local msg = workspace:FindFirstChild("MobSpawnGroup")
     if msg then
@@ -938,32 +950,30 @@ local function getBaconThiefMob()
     return nil
 end
 
--- แก้ไขฟังก์ชันตรวจหากล่องเพื่อไม่ให้วาร์ปสลับถี่เกินไป
-local lastChestCheckTime = 0
 local function checkAndInteractBox()
-    if tick() - lastChestCheckTime < 1.5 then return end
-    lastChestCheckTime = tick()
-
     local msg = workspace:FindFirstChild("MobSpawnGroup")
     if msg then
         for _, obj in ipairs(msg:GetDescendants()) do
             if obj.Name == "ChestRef" or string.find(obj.Name, "Chest") then
                 local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-                if prompt then
+                local chestPart = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
+                if prompt and chestPart then
                     local char = player.Character
                     local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    local chestPart = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
-                    if hrp and chestPart then
-                        hrp.CFrame = chestPart.CFrame + Vector3.new(0, 3, 0)
-                        task.wait(0.3)
+                    if hrp then
+                        local goalCFrame = chestPart.CFrame + Vector3.new(0, 3, 0)
+                        lastHoverCFrame = goalCFrame
+                        hrp.CFrame = goalCFrame
+                        task.wait(0.1)
                         fireproximityprompt(prompt)
-                        task.wait(0.3)
-                        break
+                        task.wait(0.2)
+                        return true
                     end
                 end
             end
         end
     end
+    return false
 end
 
 local wasFarming = false
@@ -1049,7 +1059,6 @@ task.spawn(function()
             activeFarm = SelectedBoss
         end
 
-        -- โหมด Dragon Ball
         if FarmDragonBallState then
             local piccolo = getDragonBallPiccolo()
             if piccolo and piccolo:FindFirstChild("HumanoidRootPart") then
@@ -1058,7 +1067,6 @@ task.spawn(function()
                 if not noclipConn then startNoclip() end
                 continue
             end
-        -- โหมด Farm Box
         elseif FarmBoxState then
             local thief = getBaconThiefMob()
             if thief and thief:FindFirstChild("HumanoidRootPart") then
@@ -1089,13 +1097,13 @@ task.spawn(function()
                     activeTargetHrp = target.HumanoidRootPart
                 else
                     activeTargetHrp = nil
-                    removePlatform()
                 end
             end)
         else
-            if wasFarming and not (DungeonActiveState or FarmDragonBallState or FarmBoxState) then
+            if wasFarming and not (DungeonActiveState or GoMoonDungeonActiveState or FarmDragonBallState or FarmBoxState) then
                 wasFarming = false
                 activeTargetHrp = nil
+                lastHoverCFrame = nil
                 pcall(function()
                     local char = player.Character
                     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1179,7 +1187,7 @@ task.spawn(function()
         task.wait(0.08)
         if tick() < suppressAttackUntil then continue end
 
-        local isAttackingMode = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or FarmDragonBallState or FarmBoxState
+        local isAttackingMode = FarmEnabledState or MultiFarmEnabledState or EventFarmEnabledState or AutoBossFarmState or DungeonActiveState or GoMoonDungeonActiveState or FarmDragonBallState or FarmBoxState
 
         if SelectedTool ~= "None" and isAttackingMode then
             pcall(function()
@@ -1288,12 +1296,18 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- CATEGORY: Dungeon (ระบบออโต้ลงดันเจี้ยน + เช็กดันก่อนวาร์ป + Auto Skip)
+-- CATEGORY: Dungeon (ดันเจี้ยน SpawnDungeon & GoMoon)
 -- ============================================================
 local TabDungeon = Window.AddTab(L.TabDungeon, "Dungeon")
 TabDungeon:AddSection(L.SectionDungeon)
 
 local dungeonRunning = false
+local goMoonRunning = false
+local SpawnDungeonIndex = 1
+
+TabDungeon:AddSpeedSlider(L.SpawnDungeonLevel, 1, 25, 1, function(v)
+    SpawnDungeonIndex = tonumber(v) or 1
+end, "SpawnDungeonIndex")
 
 local function getNearbyDungeonMob(radius)
     radius = radius or 300
@@ -1321,7 +1335,38 @@ local function getNearbyDungeonMob(radius)
     return closestMob
 end
 
--- ฟังก์ชัน Auto Skip Wave
+-- ปรับลำดับมอนสเตอร์ดันเจียนอีเว้นท์: ตี Bacon Big เป็นตัวสุดท้าย
+local GoMoonMobPriority = {
+    "Bacon Motorcycle",
+    "Bacon Car",
+    "Bacon",
+    "Bacon Big"
+}
+
+local currentGoMoonMobTarget = nil
+local function getGoMoonPriorityMob()
+    local mobFolder = workspace:FindFirstChild("Mob") or workspace
+
+    if currentGoMoonMobTarget and currentGoMoonMobTarget.Parent and currentGoMoonMobTarget:FindFirstChildOfClass("Humanoid") then
+        if currentGoMoonMobTarget:FindFirstChildOfClass("Humanoid").Health > 0 then
+            return currentGoMoonMobTarget
+        end
+    end
+
+    for _, name in ipairs(GoMoonMobPriority) do
+        local mob = mobFolder:FindFirstChild(name)
+        if mob and mob:FindFirstChildOfClass("Humanoid") and mob:FindFirstChild("HumanoidRootPart") then
+            if mob.Humanoid.Health > 0 then
+                currentGoMoonMobTarget = mob
+                return mob
+            end
+        end
+    end
+
+    currentGoMoonMobTarget = getNearbyDungeonMob(400)
+    return currentGoMoonMobTarget
+end
+
 local function checkAndAutoSkip()
     pcall(function()
         local pGui = player:FindFirstChild("PlayerGui")
@@ -1341,6 +1386,7 @@ local function checkAndAutoSkip()
     end)
 end
 
+-- 1. ดันเจียนปกติ (SpawnDungeon 1-25) หน่วงเวลา 32 วินาที
 local function startDungeonLoop()
     if dungeonRunning then return end
     dungeonRunning = true
@@ -1351,52 +1397,35 @@ local function startDungeonLoop()
                 local dungeonMap = workspace:FindFirstChild("DungeonMap")
                 local insideDungeonAlready = dungeonMap and (#dungeonMap:GetChildren() > 0)
 
-                -- เช็กก่อน หากอยู่ในดันเจี้ยนอยู่แล้ว จะไม่สั่งวาร์ปออกไปเปิดดันใหม่
                 if not insideDungeonAlready then
-                    Window.Notify({Title = "Dungeon", Description = "กำลังเดินทางไปเปิดดันเจี้ยน...", Duration = 3})
+                    Window.Notify({Title = "ดันเจียนปกติ", Description = "กำลังเสกดันเจี้ยนระดับ: " .. tostring(SpawnDungeonIndex), Duration = 3})
 
-                    local npcPromptFolder = workspace:FindFirstChild("NpcPrompt")
-                    local openDungeonNpc = npcPromptFolder and npcPromptFolder:FindFirstChild("Open Dungeon")
-                    
-                    if openDungeonNpc then
-                        local char = player.Character
-                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            local npcPart = openDungeonNpc:IsA("BasePart") and openDungeonNpc or openDungeonNpc:FindFirstChildWhichIsA("BasePart", true)
-                            if npcPart then
-                                hrp.CFrame = npcPart.CFrame + Vector3.new(0, 3, 0)
-                                task.wait(0.5)
-
-                                local prompt = openDungeonNpc:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                if prompt then
-                                    fireproximityprompt(prompt)
-                                end
-                            end
-                        end
-                    end
+                    pcall(function()
+                        local event = game:GetService("ReplicatedStorage").Modules.NetworkFramework.NetworkEvent
+                        event:FireServer("fire", nil, "SpawnDungeon", SpawnDungeonIndex)
+                    end)
 
                     task.wait(0.5)
                     local char = player.Character
                     local hrp = char and char:FindFirstChild("HumanoidRootPart")
                     if hrp then
                         local targetCFrame = CFrame.new(124.15, 24.52, 183.81)
+                        lastHoverCFrame = targetCFrame
                         hrp.CFrame = targetCFrame
-                        local platform = getOrCreatePlatform()
-                        platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
                     end
 
-                    Window.Notify({Title = "Dungeon", Description = "รอระบบสร้างดันเจี้ยน 17 วินาที...", Duration = 3})
-                    task.wait(17)
+                    Window.Notify({Title = "ดันเจียนปกติ", Description = "รอระบบสร้างดันเจี้ยน 32 วินาที...", Duration = 3})
+                    task.wait(32) -- ปรับเวลาหน่วงดันเจี้ยนเป็น 32 วินาทีตามที่ระบุ
                     dungeonMap = workspace:FindFirstChild("DungeonMap")
                 end
 
                 local hasDungeon = dungeonMap and (#dungeonMap:GetChildren() > 0)
 
                 if hasDungeon then
-                    Window.Notify({Title = "Dungeon", Description = "เข้าสู่ดันเจี้ยนสำเร็จ! เริ่มทำการฟาร์ม", Duration = 3})
+                    Window.Notify({Title = "ดันเจียนปกติ", Description = "เข้าสู่ดันเจี้ยนสำเร็จ! เริ่มทำการฟาร์ม", Duration = 3})
 
                     while _G.ZenithSoul_Session == mySession and DungeonActiveState and dungeonMap and #dungeonMap:GetChildren() > 0 do
-                        checkAndAutoSkip() -- เรียก Auto Skip ทุกครั้งในลูป
+                        checkAndAutoSkip()
                         local mob = getNearbyDungeonMob(300)
                         dungeonTargetMob = mob
 
@@ -1404,13 +1433,12 @@ local function startDungeonLoop()
                             activeTargetHrp = mob.HumanoidRootPart
                         else
                             activeTargetHrp = nil
-                            removePlatform()
                         end
                         task.wait(0.1)
                     end
-                    Window.Notify({Title = "Dungeon", Description = "ดันเจี้ยนจบแล้ว เตรียมเริ่มรอบใหม่...", Duration = 3})
+                    Window.Notify({Title = "ดันเจียนปกติ", Description = "ดันเจี้ยนจบแล้ว เตรียมเริ่มรอบใหม่...", Duration = 3})
                 else
-                    Window.Notify({Title = "Dungeon", Description = "ไม่พบดันเจี้ยน ลองใหม่อีกครั้ง...", Duration = 3})
+                    Window.Notify({Title = "ดันเจียนปกติ", Description = "ไม่พบดันเจี้ยน ลองใหม่อีกครั้ง...", Duration = 3})
                 end
             end)
             task.wait(2)
@@ -1418,6 +1446,70 @@ local function startDungeonLoop()
         activeTargetHrp = nil
         dungeonTargetMob = nil
         dungeonRunning = false
+        lastHoverCFrame = nil
+        removePlatform()
+    end)
+end
+
+-- 2. ดันเจียนอีเว้นท์ (GoMoon) หน่วงเวลา 32 วินาที
+local function startGoMoonDungeonLoop()
+    if goMoonRunning then return end
+    goMoonRunning = true
+
+    task.spawn(function()
+        while _G.ZenithSoul_Session == mySession and GoMoonDungeonActiveState do
+            pcall(function()
+                Window.Notify({Title = "ดันเจียนอีเว้นท์", Description = "กำลังเดินทางไป NPC GoMoon...", Duration = 3})
+
+                local npcPromptFolder = workspace:FindFirstChild("NpcPrompt")
+                local goMoonNpc = npcPromptFolder and npcPromptFolder:FindFirstChild("GoMoon")
+                if goMoonNpc then
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local npcPart = goMoonNpc:IsA("BasePart") and goMoonNpc or goMoonNpc:FindFirstChildWhichIsA("BasePart", true)
+                        if npcPart then
+                            hrp.CFrame = npcPart.CFrame + Vector3.new(0, 3, 0)
+                            task.wait(0.5)
+                            local prompt = goMoonNpc:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt then fireproximityprompt(prompt) end
+                        end
+                    end
+                end
+
+                task.wait(0.5)
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local targetCFrame = CFrame.new(27.07, 5.92, -267.03)
+                    lastHoverCFrame = targetCFrame
+                    hrp.CFrame = targetCFrame
+                end
+
+                Window.Notify({Title = "ดันเจียนอีเว้นท์", Description = "รอระบบเตรียมความพร้อม 32 วินาที...", Duration = 3})
+                task.wait(32) -- ปรับเวลาหน่วงก่อนทำงานเป็น 32 วินาที
+
+                while _G.ZenithSoul_Session == mySession and GoMoonDungeonActiveState do
+                    local mob = getGoMoonPriorityMob()
+                    if mob and mob:FindFirstChild("HumanoidRootPart") then
+                        activeTargetHrp = mob.HumanoidRootPart
+                    else
+                        activeTargetHrp = nil
+                        if hrp then
+                            local standCFrame = CFrame.new(145.33, 13.82, 777.87)
+                            lastHoverCFrame = standCFrame
+                            hrp.CFrame = standCFrame
+                        end
+                    end
+                    task.wait(0.1)
+                end
+            end)
+            task.wait(2)
+        end
+        activeTargetHrp = nil
+        goMoonRunning = false
+        lastHoverCFrame = nil
+        currentGoMoonMobTarget = nil
         removePlatform()
     end)
 end
@@ -1425,13 +1517,29 @@ end
 TabDungeon:AddToggle(L.EnableDungeon, "", function(state)
     DungeonActiveState = state
     if state then
+        if GoMoonDungeonActiveState then GoMoonDungeonActiveState = false end
         startDungeonLoop()
     else
         activeTargetHrp = nil
         dungeonTargetMob = nil
+        lastHoverCFrame = nil
         removePlatform()
     end
 end, "DungeonActiveState")
+
+TabDungeon:AddToggle(L.EnableGoMoonDungeon, "", function(state)
+    GoMoonDungeonActiveState = state
+    if state then
+        if DungeonActiveState then DungeonActiveState = false end
+        startGoMoonDungeonLoop()
+    else
+        activeTargetHrp = nil
+        goMoonRunning = false
+        lastHoverCFrame = nil
+        currentGoMoonMobTarget = nil
+        removePlatform()
+    end
+end, "GoMoonDungeonActiveState")
 
 -- ============================================================
 -- CATEGORY: Progression (เควส & อัพสเตตัส)
