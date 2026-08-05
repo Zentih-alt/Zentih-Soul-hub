@@ -1,43 +1,44 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
+repeat task.wait() until LocalPlayer
+
+task.wait(3)
+
 local BASE_URL = "https://raw.githubusercontent.com/Zentih-alt/Zentih-Soul-hub/main/"
 
 local GameScripts = {
     [104761395312874] = "LP.lua",
     [119091355492870] = "Rock.lua",
-    [1458767429]      = "ABA.lua",
+    [1458767429] = "ABA.lua",
 }
 
--- รองรับ Dungeon / Sub Place
 local GameGroups = {
     [10008473853] = "LP.lua",
 }
 
-local targetFile = GameScripts[game.PlaceId]
+local targetFile = GameScripts[game.PlaceId] or GameGroups[game.GameId]
 
-if not targetFile then
-    targetFile = GameGroups[game.GameId]
-end
+print("Loading:", targetFile)
+print("Place:", game.PlaceId)
+print("Game:", game.GameId)
 
 if targetFile then
     local success, code = pcall(function()
         return game:HttpGet(BASE_URL .. targetFile)
     end)
 
-    if success and code and #code > 0 then
+    if success then
         local func, err = loadstring(code)
 
         if func then
-            func()
+            task.spawn(func)
         else
-            warn("[Compile Error]:", err)
+            warn(err)
         end
     else
-        LocalPlayer:Kick("Load Failed: "..targetFile)
+        warn("HttpGet Failed")
     end
 else
-    LocalPlayer:Kick(
-        "Game Not Supported\nPlaceID: "..game.PlaceId
-    )
+    warn("No Script Found")
 end
