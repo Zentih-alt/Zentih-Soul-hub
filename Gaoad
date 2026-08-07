@@ -1,0 +1,298 @@
+-- [[ Game File Dumper & Remote Spy Hub (No External UI Dependency) ]] --
+-- ไม่พึ่งพา UI Library จากภายนอก แก้ปัญหา HTTP 404 ใน Delta Mobile 100%
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+
+-- ลบ UI เก่าออกหากมีอยู่แล้ว
+if CoreGui:FindFirstChild("GameDumperHubUI") then
+    CoreGui.GameDumperHubUI:Destroy()
+end
+
+--------------------------------------------------------------------------------
+-- สร้าง UI แบบ Standalone
+--------------------------------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GameDumperHubUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 480, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- สามารถลากเลื่อนหน้าจอได้บนมือถือ
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Top Bar (แถบด้านบน)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "📁 Game File Dumper Hub (P'Lam)"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 14
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TopBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -32, 0, 2)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.Parent = TopBar
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Left Tab Container
+local TabContainer = Instance.new("Frame")
+TabContainer.Size = UDim2.new(0, 120, 1, -45)
+TabContainer.Position = UDim2.new(0, 5, 0, 40)
+TabContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+TabContainer.BorderSizePixel = 0
+TabContainer.Parent = MainFrame
+
+local TabCorner = Instance.new("UICorner")
+TabCorner.CornerRadius = UDim.new(0, 6)
+TabCorner.Parent = TabContainer
+
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Padding = UDim.new(0, 4)
+TabListLayout.Parent = TabContainer
+
+-- Content Container
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Size = UDim2.new(1, -135, 1, -45)
+ContentContainer.Position = UDim2.new(0, 130, 0, 40)
+ContentContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+ContentContainer.BorderSizePixel = 0
+ContentContainer.Parent = MainFrame
+
+local ContentCorner = Instance.new("UICorner")
+ContentCorner.CornerRadius = UDim.new(0, 6)
+ContentCorner.Parent = ContentContainer
+
+--------------------------------------------------------------------------------
+-- ฟังก์ชันสร้าง Tabs & Pages
+--------------------------------------------------------------------------------
+local Pages = {}
+
+local function createTab(name, order)
+    local TabBtn = Instance.new("TextButton")
+    TabBtn.Size = UDim2.new(1, -8, 0, 32)
+    TabBtn.Position = UDim2.new(0, 4, 0, 0)
+    TabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    TabBtn.Text = name
+    TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    TabBtn.Font = Enum.Font.SourceSans
+    TabBtn.TextSize = 13
+    TabBtn.LayoutOrder = order
+    TabBtn.Parent = TabContainer
+
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.Parent = TabBtn
+
+    local Page = Instance.new("ScrollingFrame")
+    Page.Size = UDim2.new(1, -10, 1, -10)
+    Page.Position = UDim2.new(0, 5, 0, 5)
+    Page.BackgroundTransparency = 1
+    Page.ScrollBarThickness = 4
+    Page.Visible = false
+    Page.Parent = ContentContainer
+
+    local PageLayout = Instance.new("UIListLayout")
+    PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    PageLayout.Padding = UDim.new(0, 6)
+    PageLayout.Parent = Page
+
+    TabBtn.MouseButton1Click:Connect(function()
+        for _, p in pairs(Pages) do
+            p.Page.Visible = false
+            p.TabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+            p.TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        Page.Visible = true
+        TabBtn.BackgroundColor3 = Color3.fromRGB(70, 120, 240)
+        TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+
+    Pages[name] = {TabBtn = TabBtn, Page = Page}
+    return Page
+end
+
+local PageDump = createTab("Dump Files", 1)
+local PageRemotes = createTab("Remote Spy", 2)
+local PageScripts = createTab("Script Dumper", 3)
+
+-- แสดงหน้าแรก
+Pages["Dump Files"].Page.Visible = true
+Pages["Dump Files"].TabBtn.BackgroundColor3 = Color3.fromRGB(70, 120, 240)
+
+--------------------------------------------------------------------------------
+-- ตัวแปรระบบ Dumper
+--------------------------------------------------------------------------------
+local Config = {
+    FileName = "GameDump_" .. tostring(game.PlaceId),
+    RemoteSpyActive = false,
+    LoggedRemotes = {}
+}
+
+local function safeWriteFile(filename, content)
+    if writefile then
+        local success, err = pcall(function()
+            writefile(filename, content)
+        end)
+        if success then
+            print("[Success] Saved file: workspace/" .. filename)
+        else
+            warn("[Error] Writefile failed: " .. tostring(err))
+        end
+    end
+end
+
+local function dumpHierarchy(serviceName)
+    local service = game:GetService(serviceName)
+    if not service then return "" end
+
+    local function scanInstance(inst, indent)
+        indent = indent or ""
+        local str = indent .. "[-] " .. inst.Name .. " (" .. inst.ClassName .. ")\n"
+        
+        if inst:IsA("RemoteEvent") or inst:IsA("RemoteFunction") or inst:IsA("BindableEvent") then
+            str = indent .. "[REMOTE] " .. inst.Name .. " (" .. inst.ClassName .. ") Path: " .. inst:GetFullName() .. "\n"
+        end
+
+        for _, child in ipairs(inst:GetChildren()) do
+            if string.len(indent) < 14 then
+                str = str .. scanInstance(child, indent .. "  ")
+            end
+        end
+        return str
+    end
+
+    return "=== SERVICE: " .. serviceName .. " ===\n" .. scanInstance(service) .. "\n\n"
+end
+
+--------------------------------------------------------------------------------
+-- ปุ่มและฟีเจอร์ในแต่ละ Tab
+--------------------------------------------------------------------------------
+local function createButton(parent, text, color, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, -5, 0, 36)
+    Btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 62)
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.SourceSansBold
+    Btn.TextSize = 13
+    Btn.Parent = parent
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = Btn
+
+    Btn.MouseButton1Click:Connect(callback)
+    return Btn
+end
+
+-- TAB 1: Dump Files
+createButton(PageDump, "🚀 Dump ไฟล์โครงสร้างแมพ (.txt)", Color3.fromRGB(40, 140, 70), function()
+    local outputText = "=== ROBLOX GAME DUMP FOR AI ANALYSIS ===\n"
+    outputText = outputText .. "Place ID: " .. tostring(game.PlaceId) .. "\n\n"
+
+    local services = {"Workspace", "ReplicatedStorage", "StarterGui", "StarterPack", "Lighting"}
+    for _, sName in ipairs(services) do
+        pcall(function()
+            outputText = outputText .. dumpHierarchy(sName)
+        end)
+    end
+
+    safeWriteFile(Config.FileName .. ".txt", outputText)
+end)
+
+-- TAB 2: Remote Spy
+local RemoteStatusBtn
+RemoteStatusBtn = createButton(PageRemotes, "📡 สถานะ: ปิดการดักจับ Remote", Color3.fromRGB(150, 50, 50), function()
+    Config.RemoteSpyActive = not Config.RemoteSpyActive
+    if Config.RemoteSpyActive then
+        RemoteStatusBtn.Text = "📡 สถานะ: กำลังดักจับ Remote..."
+        RemoteStatusBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
+    else
+        RemoteStatusBtn.Text = "📡 สถานะ: ปิดการดักจับ Remote"
+        RemoteStatusBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+    end
+end)
+
+-- ดักจับ Remote Event
+local oldNamecall
+if hookmetamethod then
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+
+        if Config.RemoteSpyActive and (method == "FireServer" or method == "InvokeServer") then
+            local remotePath = self:GetFullName()
+            local formattedArgs = ""
+            for i, arg in ipairs(args) do
+                formattedArgs = formattedArgs .. tostring(arg) .. (i < #args and ", " or "")
+            end
+            
+            local logEntry = string.format("[%s] game:%s:%s(%s)", os.date("%X"), remotePath, method, formattedArgs)
+            table.insert(Config.LoggedRemotes, logEntry)
+        end
+
+        return oldNamecall(self, ...)
+    end)
+end
+
+createButton(PageRemotes, "💾 เซฟ Remote Logs ลงไฟล์ (.txt)", Color3.fromRGB(60, 100, 180), function()
+    if #Config.LoggedRemotes == 0 then return end
+    local content = "=== RECORDED REMOTE EVENTS ===\n\n"
+    for _, log in ipairs(Config.LoggedRemotes) do
+        content = content .. log .. "\n"
+    end
+    safeWriteFile("RemoteLogs_" .. tostring(game.PlaceId) .. ".txt", content)
+end)
+
+createButton(PageRemotes, "🗑️ ล้างประวัติ Remote", Color3.fromRGB(120, 60, 60), function()
+    Config.LoggedRemotes = {}
+end)
+
+-- TAB 3: Script Dumper
+createButton(PageScripts, "🔍 Dump รายชื่อสคริปต์ในเกมทั้งหมด", Color3.fromRGB(140, 90, 40), function()
+    local scriptLogs = "=== SCRIPTS FOUND IN GAME ===\n\n"
+    local count = 0
+
+    for _, item in ipairs(game:GetDescendants()) do
+        if item:IsA("LocalScript") or item:IsA("ModuleScript") then
+            count = count + 1
+            scriptLogs = scriptLogs .. string.format("[%d] %s: %s\nPath: %s\n\n", count, item.ClassName, item.Name, item:GetFullName())
+        end
+    end
+
+    safeWriteFile("ScriptsDump_" .. tostring(game.PlaceId) .. ".txt", scriptLogs)
+end)
