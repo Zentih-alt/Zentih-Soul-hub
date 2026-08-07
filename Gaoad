@@ -296,3 +296,5 @@ createButton(PageScripts, "🔍 Dump รายชื่อสคริปต์�
 
     safeWriteFile("ScriptsDump_" .. tostring(game.PlaceId) .. ".txt", scriptLogs)
 end)
+
+อันนี้ดีสุดม่ะ
