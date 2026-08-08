@@ -1,78 +1,146 @@
--- ============================================================
--- 🚀 Heartbeat Physics Lock (Above Angle) Module
--- ============================================================
-
+-- ===================================================
+-- ULTRA-SMOOTH CFRAME LOCK ENGINE (PURE HEARTBEAT)
+-- ===================================================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-
 local LocalPlayer = Players.LocalPlayer
 
--- ⚙️ ตัวแปรควบคุม (ปรับแต่งตามสคริปต์หลักของคุณได้เลย)
-local Settings = {
-    AutoFarm = true,             -- เปิด/ปิด การฟาร์ม
-    TargetMonster = "Bacon Trainer", -- ชื่อมอนสเตอร์เป้าหมาย
-    Distance = 8,                 -- ระยะสูงเหนือหัวมอน (Studs)
-    AutoAttack = true             -- เปิด/ปิด ตีอัตโนมัติ
+local LockEngine = {
+    Enabled = false,
+    Target = nil,            -- Target Model/BasePart
+    Angle = "Behind",        -- "Behind", "Above", "Below"
+    Distance = 7.5,          -- ระยะห่างจากเป้าหมาย
+    Connections = {},
+    LastSafeCFrame = nil
 }
 
--- 1. ฟังก์ชันค้นหามอนสเตอร์
-local function getTargetMob()
-    local mobFolder = workspace:FindFirstChild("Mob") or workspace
-    for _, mob in ipairs(mobFolder:GetChildren()) do
-        if mob.Name == Settings.TargetMonster then
-            local hum = mob:FindFirstChildOfClass("Humanoid")
-            local hrp = mob:FindFirstChild("HumanoidRootPart")
-            if hum and hum.Health > 0 and hrp then
-                return mob
-            end
+-- [1] ฟังก์ชันล้างแรงทางฟิสิกส์แบบสมบูรณ์
+local function clearVelocity(character)
+    if not character then return end
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.AssemblyLinearVelocity = Vector3.zero
+            part.AssemblyAngularVelocity = Vector3.zero
         end
     end
-    return nil
 end
 
--- 2. ระบบวาร์ปล็อกตำแหน่งบน Heartbeat (ลอยนิ่งเหนือหัว)
-RunService.Heartbeat:Connect(function()
-    if not Settings.AutoFarm then return end
-    
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    
-    if not (hrp and hum and hum.Health > 0) then return end
+-- [2] คำนวณ CFrame เป้าหมายด้วย CFrame.lookAt
+local function calculateGoalCFrame(targetHrp, angle, distance)
+    local targetPos = targetHrp.Position
 
-    local mob = getTargetMob()
-    if mob and mob:FindFirstChild("HumanoidRootPart") then
-        local targetHrp = mob.HumanoidRootPart
-        
-        -- คำนวณพิกัด Above (ลอยเหนือหัว + หันหน้ามองลงมาที่มอน)
-        local targetPos = targetHrp.Position
-        local abovePos = targetPos + Vector3.new(0, Settings.Distance, 0)
-        local goalCFrame = CFrame.lookAt(abovePos, targetPos)
-        
-        -- ล็อก CFrame + ล้างแรงฟิสิกส์
-        hrp.CFrame = goalCFrame
+    if angle == "Above" then
+        local myPos = targetPos + Vector3.new(0, distance, 0)
+        return CFrame.lookAt(myPos, targetPos)
+    elseif angle == "Below" then
+        local myPos = targetPos - Vector3.new(0, distance, 0)
+        return CFrame.lookAt(myPos, targetPos)
+    else 
+        -- Default: Behind
+        local offset = CFrame.new(0, 0, distance)
+        local targetRotation = targetHrp.CFrame - targetHrp.CFrame.Position
+        return CFrame.new(targetPos) * targetRotation * offset
+    end
+end
+
+-- [3] ฟังก์ชันดึง HumanoidRootPart ของเป้าหมายแบบยืดหยุ่น
+local function getTargetRoot(target)
+    if not target or not target:IsDescendantOf(workspace) then return nil end
+    if target:IsA("BasePart") then return target end
+    return target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("RootPart") or target:FindFirstChildOfClass("BasePart")
+end
+
+-- ===================================================
+-- PUBLIC METHODS (การเรียกใช้งาน)
+-- ===================================================
+
+-- เริ่มระบบการล็อก
+function LockEngine:Start()
+    if self.Enabled then return end
+    self.Enabled = true
+
+    -- Loop 1: Heartbeat Lock (ประมวลผลตำแหน่งเรียลไทม์)
+    self.Connections.Heartbeat = RunService.Heartbeat:Connect(function()
+        if not self.Enabled then return end
+
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        -- Freeze Velocity ทุกเฟรม
         hrp.AssemblyLinearVelocity = Vector3.zero
         hrp.AssemblyAngularVelocity = Vector3.zero
-    end
-end)
 
--- 3. ระบบ Auto Attack (ถืออาวุธและฟันอัตโนมัติ)
-task.spawn(function()
-    while true do
-        task.wait(0.05)
-        if Settings.AutoFarm and Settings.AutoAttack then
-            pcall(function()
-                local char = LocalPlayer.Character
-                if char then
-                    local tool = char:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-                    if tool then
-                        if tool.Parent ~= char then
-                            char.Humanoid:EquipTool(tool)
-                        end
-                        tool:Activate()
-                    end
+        if self.Target then
+            local tRoot = getTargetRoot(self.Target)
+            if tRoot then
+                local goalCFrame = calculateGoalCFrame(tRoot, self.Angle, self.Distance)
+                hrp.CFrame = goalCFrame
+                self.LastSafeCFrame = goalCFrame
+            end
+        elseif self.LastSafeCFrame then
+            -- ถ้าเป้าหมายหายไปชั่วคราว ให้ล็อกไว้ที่จุดปลอดภัยล่าสุด
+            hrp.CFrame = self.LastSafeCFrame
+        end
+    end)
+
+    -- Loop 2: Stepped NoClip + Physical Clearance
+    self.Connections.Stepped = RunService.Stepped:Connect(function()
+        if not self.Enabled then return end
+        local char = LocalPlayer.Character
+        if char then
+            clearVelocity(char)
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
                 end
-            end)
+            end
+        end
+    end)
+end
+
+-- หยุดระบบล็อก และคืนค่าฟิสิกส์ปกติ
+function LockEngine:Stop()
+    self.Enabled = false
+    for name, conn in pairs(self.Connections) do
+        if conn and conn.Disconnect then
+            pcall(function() conn:Disconnect() end)
         end
     end
-end)
+    self.Connections = {}
+    
+    local char = LocalPlayer.Character
+    if char then
+        clearVelocity(char)
+    end
+end
+
+-- เปลี่ยนเป้าหมายแบบ Smooth (ตัดแรงเหวี่ยงทันทีที่สลับ)
+function LockEngine:SetTarget(newTarget)
+    if self.Target ~= newTarget then
+        local char = LocalPlayer.Character
+        if char then clearVelocity(char) end
+        self.Target = newTarget
+    end
+end
+
+-- ===================================================
+-- ตัวอย่างการนำไปรันใช้งาน (USAGE EXAMPLE)
+-- ===================================================
+--[[
+-- 1. เริ่มใช้งาน
+LockEngine:Start()
+
+-- 2. กำหนดระยะและมุมมอง
+LockEngine.Angle = "Behind" -- "Behind" | "Above" | "Below"
+LockEngine.Distance = 8
+
+-- 3. กำหนดเป้าหมาย (ส่ง Model หรือ Part เข้าไปได้เลย)
+local mob = workspace.Enemies:FindFirstChild("Bandit")
+LockEngine:SetTarget(mob)
+
+-- 4. เลิกใช้งาน
+-- LockEngine:Stop()
+--]]
+
+return LockEngine
