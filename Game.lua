@@ -11,7 +11,7 @@ local GameScripts = {
     [1458767429]      = "ABA.lua",
 
     -- Rock Dungeon / Map
-    [8287810190702]   = "Rock.lua",
+    [82878101790702]   = "Rock.lua",
 }
 
 local targetFile = GameScripts[game.PlaceId]
