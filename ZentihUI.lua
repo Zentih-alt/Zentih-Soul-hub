@@ -264,6 +264,119 @@ end
 -- a destroyable GUI Instance.
 local PreviousWindowConnections = nil
 
+--// Drawn tab icons ------------------------------------------------------
+-- Defined before CreateWindow/CreateTab (which both call drawIcon) so the
+-- local is always in scope by the time either function's body actually
+-- runs — a local declared further down the file is NOT visible to a
+-- function defined earlier in the file, even though both are top-level.
+local function drawIcon(kind, parent, color)
+    -- Hand-drawn line icons built from plain Frames/UICorners — no font
+    -- glyphs (Gotham can't render most symbols) and no external asset IDs.
+    -- Each icon lives in an 18x18 box, centered by the caller.
+    local function bar(w, h, x, y, round)
+        return create("Frame", {
+            Size = UDim2.fromOffset(w, h), Position = UDim2.fromOffset(x, y),
+            BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, round and { corner(round) } or nil)
+    end
+
+    if kind == "home" then -- บ้าน
+        bar(2, 9, 3, 8, 1)          -- left wall
+        bar(2, 9, 13, 8, 1)         -- right wall
+        bar(12, 2, 3, 8, 1)         -- roof base
+        bar(2, 9, 8, 8, 1)          -- door
+        create("Frame", {
+            Size = UDim2.fromOffset(9, 2), Position = UDim2.fromOffset(1, 5),
+            Rotation = 40, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(9, 2), Position = UDim2.fromOffset(8, 5),
+            Rotation = -40, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+    elseif kind == "sword" then -- ดาบ
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 2),
+            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(8, 2), Position = UDim2.fromOffset(6, 10),
+            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 5), Position = UDim2.fromOffset(11, 11),
+            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+    elseif kind == "save" then -- สมุดเซฟ (floppy disk / save book)
+        bar(14, 14, 2, 2, 3)
+        bar(8, 5, 5, 2, 1)          -- top notch
+        bar(9, 6, 4, 9, 1)          -- bottom label area
+    elseif kind == "settings" then -- ตั้งค่า (gear)
+        create("Frame", {
+            Size = UDim2.fromOffset(11, 11), Position = UDim2.fromOffset(3.5, 3.5),
+            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
+        }, { corner(999), stroke(color, 2) })
+        for a = 0, 5 do
+            create("Frame", {
+                Size = UDim2.fromOffset(2, 4), Position = UDim2.fromOffset(8, -1),
+                Rotation = a * 60, AnchorPoint = Vector2.new(0.5, 0),
+                BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+            }, { corner(1) })
+        end
+    elseif kind == "input" then -- ช่องกรอกข้อความ / pencil
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 2),
+            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        bar(3, 3, 2, 13, 1)         -- pencil tip
+    elseif kind == "dungeon" then -- ดันเจี้ยน (stone archway/gate)
+        bar(2, 12, 2, 5, 1)                             -- left pillar
+        bar(2, 12, 14, 5, 1)                             -- right pillar
+        create("Frame", {
+            Size = UDim2.fromOffset(14, 7), Position = UDim2.fromOffset(2, 2),
+            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
+        }, { create("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(color, 2) })
+        bar(10, 2, 4, 15, 1)                             -- floor sill
+    elseif kind == "status" then -- สเตตัส (heartbeat / pulse line)
+        bar(3, 2, 1, 8, 1)
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 8), Position = UDim2.fromOffset(4, 5),
+            Rotation = 20, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(7, 2),
+            Rotation = -18, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 8), Position = UDim2.fromOffset(11, 5),
+            Rotation = 20, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        bar(3, 2, 14, 8, 1)
+    elseif kind == "eye" then -- ตา
+        create("Frame", {
+            Size = UDim2.fromOffset(16, 9), Position = UDim2.fromOffset(1, 4.5),
+            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
+        }, { corner(999), stroke(color, 2) })
+        bar(5, 5, 6.5, 6.5, 999)                         -- pupil
+    elseif kind == "star" then -- ดาว (4-point sparkle style)
+        create("Frame", {
+            Size = UDim2.fromOffset(3, 18), Position = UDim2.fromOffset(7.5, 0),
+            BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(18, 3), Position = UDim2.fromOffset(0, 7.5),
+            BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 3),
+            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 3),
+            Rotation = -45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+    end
+end
+
 --// Window ----------------------------------------------------------------
 function Zentih:CreateWindow(config)
     config = config or {}
@@ -743,114 +856,6 @@ end
 -- character — Roblox's built-in Gotham fonts can't render most symbols).
 -- Available icons: home, sword, save, settings, input, dungeon, status,
 -- eye, star
-
-local function drawIcon(kind, parent, color)
-    -- Hand-drawn line icons built from plain Frames/UICorners — no font
-    -- glyphs (Gotham can't render most symbols) and no external asset IDs.
-    -- Each icon lives in an 18x18 box, centered by the caller.
-    local function bar(w, h, x, y, round)
-        return create("Frame", {
-            Size = UDim2.fromOffset(w, h), Position = UDim2.fromOffset(x, y),
-            BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, round and { corner(round) } or nil)
-    end
-
-    if kind == "home" then -- บ้าน
-        bar(2, 9, 3, 8, 1)          -- left wall
-        bar(2, 9, 13, 8, 1)         -- right wall
-        bar(12, 2, 3, 8, 1)         -- roof base
-        bar(2, 9, 8, 8, 1)          -- door
-        create("Frame", {
-            Size = UDim2.fromOffset(9, 2), Position = UDim2.fromOffset(1, 5),
-            Rotation = 40, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(9, 2), Position = UDim2.fromOffset(8, 5),
-            Rotation = -40, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-    elseif kind == "sword" then -- ดาบ
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 2),
-            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(8, 2), Position = UDim2.fromOffset(6, 10),
-            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 5), Position = UDim2.fromOffset(11, 11),
-            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-    elseif kind == "save" then -- สมุดเซฟ (floppy disk / save book)
-        bar(14, 14, 2, 2, 3)
-        bar(8, 5, 5, 2, 1)          -- top notch
-        bar(9, 6, 4, 9, 1)          -- bottom label area
-    elseif kind == "settings" then -- ตั้งค่า (gear)
-        create("Frame", {
-            Size = UDim2.fromOffset(11, 11), Position = UDim2.fromOffset(3.5, 3.5),
-            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
-        }, { corner(999), stroke(color, 2) })
-        for a = 0, 5 do
-            create("Frame", {
-                Size = UDim2.fromOffset(2, 4), Position = UDim2.fromOffset(8, -1),
-                Rotation = a * 60, AnchorPoint = Vector2.new(0.5, 0),
-                BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-            }, { corner(1) })
-        end
-    elseif kind == "input" then -- ช่องกรอกข้อความ / pencil
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 2),
-            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        bar(3, 3, 2, 13, 1)         -- pencil tip
-    elseif kind == "dungeon" then -- ดันเจี้ยน (stone archway/gate)
-        bar(2, 12, 2, 5, 1)                             -- left pillar
-        bar(2, 12, 14, 5, 1)                             -- right pillar
-        create("Frame", {
-            Size = UDim2.fromOffset(14, 7), Position = UDim2.fromOffset(2, 2),
-            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
-        }, { create("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(color, 2) })
-        bar(10, 2, 4, 15, 1)                             -- floor sill
-    elseif kind == "status" then -- สเตตัส (heartbeat / pulse line)
-        bar(3, 2, 1, 8, 1)
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 8), Position = UDim2.fromOffset(4, 5),
-            Rotation = 20, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(7, 2),
-            Rotation = -18, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 8), Position = UDim2.fromOffset(11, 5),
-            Rotation = 20, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        bar(3, 2, 14, 8, 1)
-    elseif kind == "eye" then -- ตา
-        create("Frame", {
-            Size = UDim2.fromOffset(16, 9), Position = UDim2.fromOffset(1, 4.5),
-            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
-        }, { corner(999), stroke(color, 2) })
-        bar(5, 5, 6.5, 6.5, 999)                         -- pupil
-    elseif kind == "star" then -- ดาว (4-point sparkle style)
-        create("Frame", {
-            Size = UDim2.fromOffset(3, 18), Position = UDim2.fromOffset(7.5, 0),
-            BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(18, 3), Position = UDim2.fromOffset(0, 7.5),
-            BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 3),
-            Rotation = 45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-        create("Frame", {
-            Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 3),
-            Rotation = -45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
-        }, { corner(1) })
-    end
-end
 
 function Zentih:CreateTab(config)
     config = config or {}
