@@ -1,24 +1,180 @@
 --[[
-    Zentih UI Library — Module
+========================================================================
+ Zentih UI Library — คู่มือการใช้งาน (ภาษาไทย)
+========================================================================
 
-    This is the library only (no test/demo build). It returns the Zentih
-    table so other scripts can require() it and build their own GUI:
+นี่คือ "ไลบรารี" ไม่ใช่สคริปต์ที่รันแล้วมี GUI ขึ้นมาเลย ต้องดึงไปใช้ก่อน
+แล้วค่อยเขียนสคริปต์ของตัวเองเรียกมันอีกที (ดูตัวอย่างเต็มใน ZentihExample.lua)
 
-        local Zentih = require(path.to.ZentihLibrary)
-        local Window = Zentih:CreateWindow({ Title = "My Script" })
-        local Tab = Window:CreateTab({ Name = "Main", Icon = "home" })
-        Tab:CreateButton({ Title = "Click me", Callback = function() end })
-        ...
+------------------------------------------------------------------------
+1) วิธีโหลดไลบรารีเข้ามาใช้
+------------------------------------------------------------------------
 
-    See ZentihExample.lua for a full usage example covering every element
-    type (Sections, Labels, Dividers, Paragraphs, Buttons, Toggles,
-    Sliders, Progress Bars, Dropdowns, Multi Dropdowns, Combo Boxes,
-    Keybinds, Text Inputs, Color Pickers, Notify(), Config Save/Load,
-    live Transparency, and the 9 drawn tab icons: home, sword, save,
-    settings, input, dungeon, status, eye, star).
+-- ก. ถ้ามี 2 ไฟล์อยู่ในโฟลเดอร์เดียวกัน (ง่ายสุด ใช้ได้กับทุก executor):
+local Zentih = loadstring(readfile("ZentihLibrary.lua"))()
 
-    To load this over HTTP in an executor instead of a ModuleScript:
-        local Zentih = loadstring(game:HttpGet("<raw url to this file>"))()
+-- ข. ถ้าทำเป็น ModuleScript ใน Roblox Studio:
+local Zentih = require(script.Parent.ZentihLibrary)
+
+-- ค. ถ้าโหลดจากลิงก์ออนไลน์ (เช่น GitHub):
+local Zentih = loadstring(game:HttpGet("ลิงก์ raw ของไฟล์นี้"))()
+
+------------------------------------------------------------------------
+2) สร้างหน้าต่างหลัก (Window) — ต้องทำก่อนเสมอ
+------------------------------------------------------------------------
+
+local Window = Zentih:CreateWindow({
+    Title = "ชื่อสคริปต์ของคุณ",       -- ขึ้นมุมซ้ายบน
+    Subtitle = "อะไรก็ได้ เช่น v1.0", -- ตัวเล็กใต้ชื่อ
+    ConfigFolder = "MyScript",         -- ชื่อโฟลเดอร์เก็บไฟล์เซฟค่า
+})
+
+พอสร้าง Window แล้ว จะมี "ปุ่มลอยวงกลม" โผล่ที่ขอบขวาจอให้อัตโนมัติ
+กดปุ่มนั้นเพื่อซ่อน/เปิด GUI ทั้งหมด ลากปุ่มไปวางตรงไหนของจอก็ได้
+
+------------------------------------------------------------------------
+3) สร้างแท็บ (Tab) — 1 หน้าต่างมีได้หลายแท็บ
+------------------------------------------------------------------------
+
+local Main = Window:CreateTab({
+    Name = "หน้าหลัก",   -- ชื่อโชว์ในแถบข้างซ้าย
+    Icon = "home",       -- ไอคอนหน้าชื่อแท็บ เลือกได้: home, sword, save,
+                          -- settings, input, dungeon, status, eye, star
+    Badge = "3",          -- (ไม่ใส่ก็ได้) ป้ายตัวเลขเล็กๆ ข้างชื่อแท็บ
+})
+
+จากนั้นเอา "Main" (ตัวแปรที่ได้จาก CreateTab) ไปใส่ปุ่ม/ช่องต่างๆ ต่อ
+
+------------------------------------------------------------------------
+4) ใส่ปุ่ม/ช่องต่างๆ เข้าไปในแท็บ — เรียกผ่านตัวแปร Tab (เช่น Main)
+------------------------------------------------------------------------
+
+-- หัวข้อ/ตัวอักษร (ไม่มีอะไรให้กด)
+Main:CreateSection("หมวดหมู่นี้ชื่อ")
+Main:CreateLabel("ข้อความสั้นๆ บรรทัดเดียว")
+Main:CreateDivider()  -- เส้นคั่น
+Main:CreateParagraph({ Title = "หัวข้อ", Content = "เนื้อหายาวๆ ตัดบรรทัดเอง" })
+
+-- ปุ่มกด
+Main:CreateButton({
+    Title = "กดฉันสิ",
+    Callback = function() print("โดนกดแล้ว") end,
+})
+
+-- สวิตช์เปิด/ปิด (true/false)
+Main:CreateToggle({
+    Title = "เปิด/ปิดอะไรสักอย่าง",
+    Default = false,
+    Flag = "MyToggle",              -- ตั้งชื่อไว้ = เซฟ/โหลดค่าได้ (ดูข้อ 6)
+    Callback = function(state) print(state) end,
+})
+
+-- แถบเลื่อนเลือกตัวเลข
+Main:CreateSlider({
+    Title = "ความเร็ว",
+    Min = 0, Max = 100, Default = 16,
+    Flag = "SpeedSlider",
+    Callback = function(value) print(value) end,
+})
+
+-- เลือก 1 อย่างจากลิสต์
+Main:CreateDropdown({
+    Title = "เลือกโหมด",
+    Options = { "โหมด1", "โหมด2", "โหมด3" },
+    Default = "โหมด1",
+    Flag = "ModeSelect",
+    Callback = function(picked) print(picked) end,
+})
+
+-- เลือกได้หลายอย่างจากลิสต์
+Main:CreateMultiDropdown({
+    Title = "เลือกได้หลายอัน",
+    Options = { "A", "B", "C" },
+    Default = { "A" },
+    Callback = function(pickedList) print(#pickedList) end,
+})
+
+-- ช่องพิมพ์ข้อความ
+Main:CreateInput({
+    Title = "ใส่ชื่อ",
+    Placeholder = "พิมพ์ตรงนี้...",
+    Callback = function(text) print(text) end,
+})
+
+-- ปุ่มตั้งค่าคีย์ลัด (กดปุ่มแล้วกดคีย์บอร์ดเพื่อตั้งใหม่)
+Main:CreateKeybind({
+    Title = "คีย์เปิดเมนู",
+    Default = Enum.KeyCode.RightShift,
+    Callback = function(key) print(key) end,
+})
+
+-- เลือกสี
+Main:CreateColorPicker({
+    Title = "เลือกสี",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color) print(color) end,
+})
+
+-- แถบ progress (โชว์ค่า/max) — สั่งอัปเดตด้วย handle:Set(ตัวเลข)
+local Bar = Main:CreateProgressBar({ Title = "ความคืบหน้า", Max = 100 })
+Bar:Set(72)
+
+-- ตัวเลขที่อัปเดตสดๆ (เช่น เงิน, kill count) — โชว์ +/- ตอนค่าเปลี่ยน
+local Kills = Main:CreateStat({ Title = "จำนวนคิล", Default = 0 })
+Kills:Set(5)
+
+------------------------------------------------------------------------
+5) แจ้งเตือน / ป็อปอัพยืนยัน
+------------------------------------------------------------------------
+
+Window:Notify({ Title = "หัวข้อ", Content = "ข้อความ", Duration = 3 })
+
+Window:CreatePopup({
+    Title = "ยืนยันไหม?",
+    Content = "กดยืนยันเพื่อดำเนินการต่อ",
+    Buttons = {
+        { Title = "ยกเลิก" },
+        { Title = "ยืนยัน", Callback = function() print("ยืนยันแล้ว") end },
+    },
+})
+
+------------------------------------------------------------------------
+6) เซฟ/โหลดค่าที่ตั้งไว้ (ต้องใส่ Flag ให้ element นั้นๆ ก่อน — ดูข้อ 4)
+------------------------------------------------------------------------
+
+Window:SaveConfig("default")     -- เซฟทุกค่าที่มี Flag ไว้เป็นไฟล์ชื่อ default
+Window:LoadConfig("default")     -- โหลดกลับมา
+local v = Window:GetFlag("MyToggle")  -- ดึงค่าปัจจุบันของ Flag ตรงๆ
+
+ตั้งชื่อไฟล์ (name) ต่างกันได้หลายไฟล์ เช่น SaveConfig("build1"),
+SaveConfig("build2") — เก็บแยกกันได้ ไม่ทับกัน
+
+------------------------------------------------------------------------
+7) ปรับความโปร่งใส (โปร่งใส/ทึบ ของตัว GUI เอง) แบบสดๆ
+------------------------------------------------------------------------
+
+Window:SetTransparency(windowAlpha, cardAlpha, panelAlpha)
+-- ตัวเลข 0 = ทึบสุด, 1 = โปร่งใสหมด, ใส่ nil ตัวไหนไว้ = ไม่แตะค่านั้น
+Window:SetTransparency(0.15, 0.06, 0)
+
+------------------------------------------------------------------------
+8) ปิดโปรแกรม / ทำลาย GUI ทิ้งทั้งหมด
+------------------------------------------------------------------------
+
+Window:Destroy()   -- ปิด GUI และเลิกใช้ connection ทั้งหมดให้เรียบร้อย
+
+------------------------------------------------------------------------
+ข้อควรระวัง
+------------------------------------------------------------------------
+
+- ห้ามพิมพ์ตัวอักษรพิเศษ/สัญลักษณ์ (✓ ⚙ ▾ ✎ ฯลฯ) ใส่ใน Title/Text เอง —
+  font ของ Roblox ไม่รองรับ จะกลายเป็นกล่องว่างหรือไม่ขึ้นเลย ใช้ตัวอักษร
+  ปกติ (ก-ฮ, a-z, ตัวเลข) เท่านั้น
+- ถ้ารันสคริปต์ตัวเองซ้ำหลายรอบ (เช่น ทดสอบไปเรื่อยๆ) ไม่ต้องกังวล —
+  ไลบรารีจะเคลียร์ของรอบเก่าให้อัตโนมัติทุกครั้งที่เรียก CreateWindow ใหม่
+- ดูรายละเอียดพารามิเตอร์ครบทุกฟังก์ชันได้ในไฟล์ API.md (ภาษาอังกฤษ)
+
+========================================================================
 ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -26,8 +182,15 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+-- LocalPlayer can briefly be nil if this script runs before the client has
+-- fully joined; wait for it instead of erroring immediately. PlayerGui is
+-- waited for with a timeout rather than indefinitely, so a rare edge case
+-- (unusual account/client state) can't silently hang the whole script
+-- forever with no error and no way to recover.
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
+    or LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    or error("Zentih: PlayerGui did not become available within 10 seconds")
 
 local Theme = {
     Background    = Color3.fromRGB(18, 21, 29),
@@ -90,8 +253,16 @@ Zentih.__index = Zentih
 local OpenPanels = {}
 local function registerPanel(closeFn) OpenPanels[#OpenPanels + 1] = closeFn end
 local function closeAllPanelsExcept(exceptFn)
-    for _, fn in ipairs(OpenPanels) do if fn ~= exceptFn then fn() end end
+    for _, fn in ipairs(OpenPanels) do if fn ~= exceptFn then pcall(fn) end end
 end
+
+-- Tracks the previous CreateWindow's connections/state at module scope, so
+-- re-running the script (common while iterating, or on a script hot-reload)
+-- doesn't stack up duplicate UserInputService connections forever. Without
+-- this, every re-run leaks the prior run's drag/slider/colorpicker input
+-- listeners permanently, since those live on a global service rather than
+-- a destroyable GUI Instance.
+local PreviousWindowConnections = nil
 
 --// Window ----------------------------------------------------------------
 function Zentih:CreateWindow(config)
@@ -100,16 +271,33 @@ function Zentih:CreateWindow(config)
     local subtitle = config.Subtitle or ""
     local configFolder = config.ConfigFolder or "ZentihUI"
 
+    if PreviousWindowConnections then
+        for _, conn in ipairs(PreviousWindowConnections) do pcall(function() conn:Disconnect() end) end
+    end
+    OpenPanels = {}
+
     local existing = PlayerGui:FindFirstChild("ZentihUI")
     if existing then existing:Destroy() end
+    local coreGuiExisting = pcall(function()
+        local core = game:GetService("CoreGui"):FindFirstChild("ZentihUI")
+        if core then core:Destroy() end
+    end)
     safeMakeFolder(configFolder)
 
     local ScreenGui = create("ScreenGui", {
         Name = "ZentihUI", ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         DisplayOrder = 100,
-        Parent = PlayerGui,
     })
+    -- Prefer CoreGui: it survives character respawns cleanly and isn't
+    -- cleared by ResetOnSpawn-style logic some games run on PlayerGui.
+    -- Some executors block CoreGui access, so fall back to PlayerGui.
+    local parentedToCoreGui = pcall(function()
+        ScreenGui.Parent = game:GetService("CoreGui")
+    end)
+    if not parentedToCoreGui then
+        ScreenGui.Parent = PlayerGui
+    end
 
     local Main = create("Frame", {
         Name = "Main", Size = UDim2.fromOffset(760, 560),
@@ -306,6 +494,8 @@ function Zentih:CreateWindow(config)
         _windowAlpha = WINDOW_TRANSPARENCY, _cardAlpha = CARD_TRANSPARENCY, _panelAlpha = PANEL_TRANSPARENCY,
         ToggleBubble = ToggleBubble,
     }, Zentih)
+
+    PreviousWindowConnections = Connections
 
     return Window
 end
@@ -542,6 +732,7 @@ end
 function Zentih:Destroy()
     if self._connections then
         for _, conn in ipairs(self._connections) do pcall(function() conn:Disconnect() end) end
+        if PreviousWindowConnections == self._connections then PreviousWindowConnections = nil end
     end
     OpenPanels = {}
     if self.ScreenGui then self.ScreenGui:Destroy() end
@@ -961,11 +1152,11 @@ function Zentih:CreateTab(config)
         ClickArea.MouseButton1Click:Connect(function()
             state = not state
             render()
-            callback(state)
+            pcall(callback, state)
         end)
 
-        registerFlag(config.Flag, function() return state end, function(v) state = v; render(); callback(state) end)
-        return { Set = function(_, v) state = v; render(); callback(state) end, Get = function() return state end }
+        registerFlag(config.Flag, function() return state end, function(v) state = v; render(); pcall(callback, state) end)
+        return { Set = function(_, v) state = v; render(); pcall(callback, state) end, Get = function() return state end }
     end
 
     function Tab:CreateButton(config)
@@ -1038,7 +1229,7 @@ function Zentih:CreateTab(config)
             Fill.Size = UDim2.new(alpha, 0, 1, 0)
             Knob.Position = UDim2.new(alpha, -7, 0.5, -7)
             ValueLabel.Text = tostring(value)
-            callback(value)
+            pcall(callback, value)
         end
         Track.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -1046,12 +1237,12 @@ function Zentih:CreateTab(config)
                 setFromAlpha((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X)
             end
         end)
-        UserInputService.InputChanged:Connect(function(input)
+        self.Window._connections[#self.Window._connections + 1] = UserInputService.InputChanged:Connect(function(input)
             if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 setFromAlpha((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X)
             end
         end)
-        UserInputService.InputEnded:Connect(function(input)
+        self.Window._connections[#self.Window._connections + 1] = UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging = false
             end
@@ -1140,13 +1331,13 @@ function Zentih:CreateTab(config)
                     tween(bar, { BackgroundTransparency = (o == opt) and 0 or 1 }, 0.12)
                 end
                 close()
-                callback(opt)
+                pcall(callback, opt)
             end)
         end
         SelectBtn.MouseButton1Click:Connect(toggleOpen)
 
-        registerFlag(config.Flag, function() return currentValue end, function(v) currentValue = v; SelectedLabel.Text = v; callback(v) end)
-        return { Set = function(_, v) currentValue = v; SelectedLabel.Text = v; callback(v) end }
+        registerFlag(config.Flag, function() return currentValue end, function(v) currentValue = v; SelectedLabel.Text = v; pcall(callback, v) end)
+        return { Set = function(_, v) currentValue = v; SelectedLabel.Text = v; pcall(callback, v) end }
     end
 
 
@@ -1179,7 +1370,7 @@ function Zentih:CreateTab(config)
                     KeyBtn.Text = input.KeyCode.Name
                     listening = false
                     conn:Disconnect()
-                    callback(input.KeyCode)
+                    pcall(callback, input.KeyCode)
                 end
             end)
             self.Window._connections[#self.Window._connections + 1] = conn
@@ -1210,7 +1401,7 @@ function Zentih:CreateTab(config)
         }, { corner(R.Control) })
         create("UIPadding", { PaddingLeft = UDim.new(0, 10) }).Parent = Box
 
-        Box.FocusLost:Connect(function(enterPressed) callback(Box.Text, enterPressed) end)
+        Box.FocusLost:Connect(function(enterPressed) pcall(callback, Box.Text, enterPressed) end)
         registerFlag(config.Flag, function() return Box.Text end, function(v) Box.Text = v end)
         return { Set = function(_, v) Box.Text = v end }
     end
@@ -1308,7 +1499,7 @@ function Zentih:CreateTab(config)
                 SelectedLabel.Text = selectedText()
                 local list = {}
                 for o in pairs(selected) do list[#list + 1] = o end
-                callback(list)
+                pcall(callback, list)
             end)
         end
 
@@ -1416,19 +1607,19 @@ function Zentih:CreateTab(config)
                     tween(bar, { BackgroundTransparency = (o == opt) and 0 or 1 }, 0.12)
                 end
                 close()
-                callback(opt)
+                pcall(callback, opt)
             end)
         end
 
         registerFlag(config.Flag, function() return currentValue end, function(v)
             currentValue = v; SelectedLabel.Text = v
             for o, bar in pairs(optAccents) do tween(bar, { BackgroundTransparency = (o == v) and 0 or 1 }, 0.12) end
-            callback(v)
+            pcall(callback, v)
         end)
         return { Set = function(_, v)
             currentValue = v; SelectedLabel.Text = v
             for o, bar in pairs(optAccents) do tween(bar, { BackgroundTransparency = (o == v) and 0 or 1 }, 0.12) end
-            callback(v)
+            pcall(callback, v)
         end }
     end
 
@@ -1483,7 +1674,7 @@ function Zentih:CreateTab(config)
         local function updateColor()
             currentColor = Color3.fromHSV(h, s, v)
             Swatch.BackgroundColor3 = currentColor
-            callback(currentColor)
+            pcall(callback, currentColor)
         end
 
         local function bindChannel(track, knob, getSet)
@@ -1500,12 +1691,12 @@ function Zentih:CreateTab(config)
                     apply(input)
                 end
             end)
-            UserInputService.InputChanged:Connect(function(input)
+            self.Window._connections[#self.Window._connections + 1] = UserInputService.InputChanged:Connect(function(input)
                 if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                     apply(input)
                 end
             end)
-            UserInputService.InputEnded:Connect(function(input)
+            self.Window._connections[#self.Window._connections + 1] = UserInputService.InputEnded:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     dragging = false
                 end
@@ -1536,14 +1727,14 @@ function Zentih:CreateTab(config)
                 HKnob.Position = UDim2.new(h, -6, 0.5, -6)
                 SKnob.Position = UDim2.new(s, -6, 0.5, -6)
                 VKnob.Position = UDim2.new(v, -6, 0.5, -6)
-                callback(currentColor)
+                pcall(callback, currentColor)
             end)
 
         return { Set = function(_, color)
             currentColor = color
             h, s, v = currentColor:ToHSV()
             Swatch.BackgroundColor3 = currentColor
-            callback(currentColor)
+            pcall(callback, currentColor)
         end }
     end
 
