@@ -253,6 +253,50 @@ function Zentih:CreateWindow(config)
     TransparencyRegistry.Window[#TransparencyRegistry.Window + 1] = Sidebar
     TransparencyRegistry.Window[#TransparencyRegistry.Window + 1] = TopBar
 
+    --// Floating toggle bubble — a small draggable circle docked to the
+    -- screen edge that shows/hides the whole window. Lets the player bring
+    -- the GUI back after closing/hiding it, without needing to re-run the
+    -- script. Starts on the right edge, vertically centered.
+    local ToggleBubble = create("TextButton", {
+        Text = "", AutoButtonColor = false, Size = UDim2.fromOffset(48, 48),
+        Position = UDim2.new(1, -64, 0.5, -24),
+        BackgroundColor3 = Theme.Card, BackgroundTransparency = 0,
+        ZIndex = 100, Parent = ScreenGui,
+    }, { corner(999), stroke(Theme.Stroke, 1) })
+    local ToggleIcon = create("Frame", {
+        Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(15, 15),
+        BackgroundTransparency = 1, ZIndex = 100, Parent = ToggleBubble,
+    })
+    drawIcon("eye", ToggleIcon, Theme.TextPrimary)
+
+    do
+        local dragging, dragStart, startPos, moved
+        track(ToggleBubble.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                moved = false
+                dragStart = input.Position
+                startPos = ToggleBubble.Position
+            end
+        end))
+        track(UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                if delta.Magnitude > 4 then moved = true end
+                ToggleBubble.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end))
+        track(UserInputService.InputEnded:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                dragging = false
+                if not moved then
+                    Main.Visible = not Main.Visible
+                end
+            end
+        end))
+    end
+
     local Window = setmetatable({
         ScreenGui = ScreenGui, Main = Main, Sidebar = Sidebar, Content = Content,
         NotifyHolder = NotifyHolder, ConfigFolder = configFolder, Overlay = Overlay,
@@ -260,6 +304,7 @@ function Zentih:CreateWindow(config)
         _connections = Connections, _tabListTop = TAB_LIST_TOP,
         _transparency = TransparencyRegistry,
         _windowAlpha = WINDOW_TRANSPARENCY, _cardAlpha = CARD_TRANSPARENCY, _panelAlpha = PANEL_TRANSPARENCY,
+        ToggleBubble = ToggleBubble,
     }, Zentih)
 
     return Window
