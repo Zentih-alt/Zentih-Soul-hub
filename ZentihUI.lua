@@ -150,7 +150,27 @@ local v = Window:GetFlag("MyToggle")  -- ดึงค่าปัจจุบั
 SaveConfig("build2") — เก็บแยกกันได้ ไม่ทับกัน
 
 ------------------------------------------------------------------------
-7) ปรับความโปร่งใส (โปร่งใส/ทึบ ของตัว GUI เอง) แบบสดๆ
+7) เปลี่ยนธีมสี ทั้ง GUI แบบสดๆ (ไม่ต้องรีสตาร์ทสคริปต์)
+------------------------------------------------------------------------
+
+Window:SetTheme("ชื่อธีม")
+
+มี 4 ธีมให้เลือก:
+  "Original"     -- ธีมต้นฉบับ (ฟ้าเข้ม เป็นค่าเริ่มต้น)
+  "Black"        -- ดำสุด แทบไม่มีสีอื่นเลย
+  "CrimsonNight" -- แดงเลือดหมูผสมดำ
+  "OceanTeal"    -- ฟ้าอมเขียวผสมดำ โทนเย็น
+
+ตัวอย่างทำเป็นเมนูให้ผู้เล่นเลือกเองได้:
+Main:CreateDropdown({
+    Title = "ธีมสี",
+    Options = { "Original", "Black", "CrimsonNight", "OceanTeal" },
+    Default = "Original",
+    Callback = function(name) Window:SetTheme(name) end,
+})
+
+------------------------------------------------------------------------
+8) ปรับความโปร่งใส (โปร่งใส/ทึบ ของตัว GUI เอง) แบบสดๆ
 ------------------------------------------------------------------------
 
 Window:SetTransparency(windowAlpha, cardAlpha, panelAlpha)
@@ -158,7 +178,7 @@ Window:SetTransparency(windowAlpha, cardAlpha, panelAlpha)
 Window:SetTransparency(0.15, 0.06, 0)
 
 ------------------------------------------------------------------------
-8) ปิดโปรแกรม / ทำลาย GUI ทิ้งทั้งหมด
+9) ปิดโปรแกรม / ทำลาย GUI ทิ้งทั้งหมด
 ------------------------------------------------------------------------
 
 Window:Destroy()   -- ปิด GUI และเลิกใช้ connection ทั้งหมดให้เรียบร้อย
@@ -192,24 +212,83 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
     or LocalPlayer:FindFirstChildOfClass("PlayerGui")
     or error("Zentih: PlayerGui did not become available within 10 seconds")
 
-local Theme = {
-    Background    = Color3.fromRGB(18, 21, 29),
-    Sidebar       = Color3.fromRGB(14, 17, 24),
-    TopBar        = Color3.fromRGB(14, 17, 24),
-    Card          = Color3.fromRGB(25, 29, 39),
-    CardHover     = Color3.fromRGB(30, 35, 46),
-    Stroke        = Color3.fromRGB(34, 38, 50),
-    Accent        = Color3.fromRGB(64, 132, 245),
-    TextPrimary   = Color3.fromRGB(238, 239, 243),
-    TextSecondary = Color3.fromRGB(142, 148, 163),
-    TextTab       = Color3.fromRGB(150, 156, 170),
-    TextTabActive = Color3.fromRGB(240, 241, 245),
-    ToggleOff     = Color3.fromRGB(52, 57, 70),
-    ToggleKnob    = Color3.fromRGB(255, 255, 255),
-    SliderTrack   = Color3.fromRGB(46, 51, 64),
-    Success       = Color3.fromRGB(72, 187, 120),
-    Error         = Color3.fromRGB(224, 92, 92),
+local ThemePresets = {
+    Original = {
+        Background    = Color3.fromRGB(18, 21, 29),
+        Sidebar       = Color3.fromRGB(14, 17, 24),
+        TopBar        = Color3.fromRGB(14, 17, 24),
+        Card          = Color3.fromRGB(25, 29, 39),
+        CardHover     = Color3.fromRGB(30, 35, 46),
+        Stroke        = Color3.fromRGB(34, 38, 50),
+        Accent        = Color3.fromRGB(64, 132, 245),
+        TextPrimary   = Color3.fromRGB(238, 239, 243),
+        TextSecondary = Color3.fromRGB(142, 148, 163),
+        TextTab       = Color3.fromRGB(150, 156, 170),
+        TextTabActive = Color3.fromRGB(240, 241, 245),
+        ToggleOff     = Color3.fromRGB(52, 57, 70),
+        ToggleKnob    = Color3.fromRGB(255, 255, 255),
+        SliderTrack   = Color3.fromRGB(46, 51, 64),
+        Success       = Color3.fromRGB(72, 187, 120),
+        Error         = Color3.fromRGB(224, 92, 92),
+    },
+    Black = { -- ดำสุด — near-pure black, minimal color anywhere
+        Background    = Color3.fromRGB(6, 6, 7),
+        Sidebar       = Color3.fromRGB(3, 3, 4),
+        TopBar        = Color3.fromRGB(3, 3, 4),
+        Card          = Color3.fromRGB(12, 12, 14),
+        CardHover     = Color3.fromRGB(18, 18, 20),
+        Stroke        = Color3.fromRGB(26, 26, 29),
+        Accent        = Color3.fromRGB(120, 120, 128),
+        TextPrimary   = Color3.fromRGB(235, 235, 237),
+        TextSecondary = Color3.fromRGB(130, 130, 135),
+        TextTab       = Color3.fromRGB(120, 120, 125),
+        TextTabActive = Color3.fromRGB(245, 245, 246),
+        ToggleOff     = Color3.fromRGB(30, 30, 33),
+        ToggleKnob    = Color3.fromRGB(255, 255, 255),
+        SliderTrack   = Color3.fromRGB(22, 22, 25),
+        Success       = Color3.fromRGB(72, 187, 120),
+        Error         = Color3.fromRGB(224, 92, 92),
+    },
+    CrimsonNight = { -- แดงเลือดหมูผสมดำ เน้นสีแดงเป็นจุดเด่น
+        Background    = Color3.fromRGB(20, 14, 15),
+        Sidebar       = Color3.fromRGB(15, 10, 11),
+        TopBar        = Color3.fromRGB(15, 10, 11),
+        Card          = Color3.fromRGB(28, 19, 20),
+        CardHover     = Color3.fromRGB(35, 24, 25),
+        Stroke        = Color3.fromRGB(50, 32, 34),
+        Accent        = Color3.fromRGB(230, 70, 80),
+        TextPrimary   = Color3.fromRGB(245, 235, 236),
+        TextSecondary = Color3.fromRGB(180, 155, 157),
+        TextTab       = Color3.fromRGB(160, 135, 137),
+        TextTabActive = Color3.fromRGB(250, 240, 241),
+        ToggleOff     = Color3.fromRGB(55, 36, 38),
+        ToggleKnob    = Color3.fromRGB(255, 255, 255),
+        SliderTrack   = Color3.fromRGB(45, 29, 31),
+        Success       = Color3.fromRGB(72, 187, 120),
+        Error         = Color3.fromRGB(255, 100, 100),
+    },
+    OceanTeal = { -- ฟ้าอมเขียวผสมดำ โทนเย็น
+        Background    = Color3.fromRGB(12, 20, 22),
+        Sidebar       = Color3.fromRGB(8, 15, 17),
+        TopBar        = Color3.fromRGB(8, 15, 17),
+        Card          = Color3.fromRGB(16, 28, 31),
+        CardHover     = Color3.fromRGB(21, 36, 40),
+        Stroke        = Color3.fromRGB(28, 48, 52),
+        Accent        = Color3.fromRGB(60, 210, 195),
+        TextPrimary   = Color3.fromRGB(230, 245, 244),
+        TextSecondary = Color3.fromRGB(145, 180, 178),
+        TextTab       = Color3.fromRGB(130, 165, 163),
+        TextTabActive = Color3.fromRGB(240, 250, 249),
+        ToggleOff     = Color3.fromRGB(32, 54, 58),
+        ToggleKnob    = Color3.fromRGB(255, 255, 255),
+        SliderTrack   = Color3.fromRGB(25, 44, 48),
+        Success       = Color3.fromRGB(72, 187, 120),
+        Error         = Color3.fromRGB(224, 92, 92),
+    },
 }
+
+local Theme = {}
+for k, v in pairs(ThemePresets.Original) do Theme[k] = v end
 
 local R = { Window = 10, TopChip = 7, CtrlBtn = 6, Card = 7, Control = 6, Knob = 999 }
 -- Global see-through look: every layer (window, topbar, sidebar, content,
@@ -226,9 +305,41 @@ local PANEL_TRANSPARENCY  = 0    -- 100% opacity, matches Settings > Popout Opac
 -- anchoring). Coordinates are Main-local (Overlay covers Main 1:1).
 local POPOUT_FIXED_X, POPOUT_FIXED_Y = 202, 108
 
+-- Reverse lookup: Color3 value -> theme key name, rebuilt whenever the
+-- active theme changes. Lets create() figure out which Theme.X a Color3
+-- value came from without touching any of the ~110 element call sites
+-- that already read Theme.Card / Theme.Accent / etc. directly.
+local ColorKeyOf = {}
+local function rebuildColorKeyOf()
+    ColorKeyOf = {}
+    for key, value in pairs(Theme) do
+        if typeof(value) == "Color3" then
+            ColorKeyOf[value] = key
+        end
+    end
+end
+rebuildColorKeyOf()
+
+-- Every (instance, property, themeKey) triple currently live on screen,
+-- so a theme switch can walk this and update everything at once.
+local ThemedInstances = {}
+
+local THEMED_PROPS = {
+    BackgroundColor3 = true, TextColor3 = true, Color = true,
+    PlaceholderColor3 = true, ScrollBarImageColor3 = true,
+}
+
 local function create(class, props, children)
     local inst = Instance.new(class)
-    for k, v in pairs(props or {}) do inst[k] = v end
+    for k, v in pairs(props or {}) do
+        inst[k] = v
+        if THEMED_PROPS[k] and typeof(v) == "Color3" then
+            local key = ColorKeyOf[v]
+            if key then
+                ThemedInstances[#ThemedInstances + 1] = { inst = inst, prop = k, key = key }
+            end
+        end
+    end
     for _, c in ipairs(children or {}) do c.Parent = inst end
     return inst
 end
@@ -388,6 +499,9 @@ function Zentih:CreateWindow(config)
         for _, conn in ipairs(PreviousWindowConnections) do pcall(function() conn:Disconnect() end) end
     end
     OpenPanels = {}
+    ThemedInstances = {}
+    for k, v in pairs(ThemePresets.Original) do Theme[k] = v end
+    rebuildColorKeyOf()
 
     local existing = PlayerGui:FindFirstChild("ZentihUI")
     if existing then existing:Destroy() end
@@ -605,7 +719,7 @@ function Zentih:CreateWindow(config)
         _connections = Connections, _tabListTop = TAB_LIST_TOP,
         _transparency = TransparencyRegistry,
         _windowAlpha = WINDOW_TRANSPARENCY, _cardAlpha = CARD_TRANSPARENCY, _panelAlpha = PANEL_TRANSPARENCY,
-        ToggleBubble = ToggleBubble,
+        ToggleBubble = ToggleBubble, CurrentTheme = "Original",
     }, Zentih)
 
     PreviousWindowConnections = Connections
@@ -631,6 +745,33 @@ function Zentih:SetTransparency(windowAlpha, cardAlpha, panelAlpha)
     for _, inst in ipairs(self._transparency.Panel) do
         pcall(function() inst.BackgroundTransparency = self._panelAlpha end)
     end
+end
+
+-- Available theme names: Original, Black, CrimsonNight, OceanTeal.
+-- Switches every tracked element's color live, no restart needed. Any
+-- ThemedInstances entry whose Instance was destroyed (element removed) is
+-- silently skipped and pruned.
+function Zentih:SetTheme(name)
+    local preset = ThemePresets[name]
+    if not preset then return false end
+
+    for key, value in pairs(preset) do Theme[key] = value end
+    rebuildColorKeyOf()
+
+    local alive = {}
+    for _, entry in ipairs(ThemedInstances) do
+        if entry.inst.Parent then
+            local newColor = Theme[entry.key]
+            if newColor then
+                pcall(function() tween(entry.inst, { [entry.prop] = newColor }, 0.2) end)
+            end
+            alive[#alive + 1] = entry
+        end
+    end
+    ThemedInstances = alive
+
+    self.CurrentTheme = name
+    return true
 end
 
 --// Notifications ------------------------------------------------------
