@@ -1064,6 +1064,15 @@ function Zentih:CreateTab(config)
     }).Parent = Page
     create("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }).Parent = Page
 
+    -- Scrolling this tab's content closes any open dropdown/combobox/popout
+    -- list. Popouts float in a fixed spot on Overlay (by design — they
+    -- don't track their button), so if the player scrolls past the row
+    -- that opened one, it would otherwise keep floating on screen and
+    -- cover whatever they scrolled to. Closing it on scroll avoids that.
+    self._connections[#self._connections + 1] = Page:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+        closeAllPanelsExcept(nil)
+    end)
+
     Tab.Page = Page
 
     local function setActive(active)
@@ -1080,6 +1089,7 @@ function Zentih:CreateTab(config)
     end
 
     TabButton.MouseButton1Click:Connect(function()
+        closeAllPanelsExcept(nil)
         for _, t in pairs(self.Tabs) do t.setActive(false) end
         setActive(true)
     end)
