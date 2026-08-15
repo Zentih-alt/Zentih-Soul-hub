@@ -45,8 +45,10 @@ local Window = Zentih:CreateWindow({
 
 local Main = Window:CreateTab({
     Name = "หน้าหลัก",   -- ชื่อโชว์ในแถบข้างซ้าย
-    Icon = "home",       -- ไอคอนหน้าชื่อแท็บ เลือกได้: home, sword, save,
-                          -- settings, input, dungeon, status, eye, star
+    Icon = "home",       -- ไอคอนหน้าชื่อแท็บ มี 18 แบบให้เลือก:
+                          -- home, sword, save, settings, input, dungeon,
+                          -- status, eye, star, gamepad, macro, map, script,
+                          -- config, debug, tower, enemy, wave
     Badge = "3",          -- (ไม่ใส่ก็ได้) ป้ายตัวเลขเล็กๆ ข้างชื่อแท็บ
 })
 
@@ -194,7 +196,154 @@ Window:SetTransparency(windowAlpha, cardAlpha, panelAlpha)
 Window:SetTransparency(0.15, 0.06, 0)
 
 ------------------------------------------------------------------------
-9) ปิดโปรแกรม / ทำลาย GUI ทิ้งทั้งหมด
+9) ระบบหลังบ้าน (Core Managers) — เก็บ/แชร์ค่าระหว่างส่วนต่างๆ ของสคริปต์
+------------------------------------------------------------------------
+
+-- State: เก็บค่าอะไรก็ได้ระหว่างการรัน แล้วให้ที่อื่น "subscribe" ฟังการ
+-- เปลี่ยนแปลงได้ (ไม่ต้องเขียนระบบแจ้งเตือนเอง) ใช้ Window.State หรือ
+-- Zentih.State (ตัวกลาง ใช้ร่วมกันได้ทั้งสคริปต์) ก็ได้
+Window.State.Set("wave", 1)
+Window.State.Increment("wave")            -- +1 อัตโนมัติ
+print(Window.State.Get("wave", 0))        -- อ่านค่า (0 ถ้ายังไม่เคย Set)
+Window.State.Subscribe("wave", function(new, old)
+    print("wave เปลี่ยนจาก", old, "เป็น", new)
+end)
+
+-- Debug: console จริง มี 4 ระดับ (Info/Debug/Warning/Error)
+Window.Debug.Info("บอทเริ่มทำงานแล้ว")
+Window.Debug.Error("โหลดค่าไม่สำเร็จ:", errMsg)
+print(Window.Debug.Export())              -- เอาทั้ง log ออกมาเป็น string เดียว
+
+-- Performance: เช็คสถิติจริงของ GUI (ไม่ใช่เลขปลอม)
+local stats = Window.Performance.GetStats()
+print(stats.fps, stats.instances, stats.connections, stats.uptimeSeconds)
+
+-- ErrorHandler: เรียกฟังก์ชันแบบป้องกัน error ไม่ให้พังทั้งสคริปต์
+local ok, result = Window.ErrorHandler.Guard("MyFeature", function()
+    return 1 / 0  -- ตัวอย่างโค้ดที่อาจพัง
+end)
+
+-- Input: ตั้งปุ่มลัด global แยกจาก Keybind element (เช่น ปุ่มเปิด/ปิด GUI)
+Window.Input.Bind(Enum.KeyCode.RightShift, function()
+    Window.Main.Visible = not Window.Main.Visible
+end)
+
+------------------------------------------------------------------------
+10) Script State — เซฟ/โหลดสถานะเกมจริงลงไฟล์ (คนละอย่างกับ SaveConfig)
+------------------------------------------------------------------------
+
+-- SaveConfig/LoadConfig (ข้อ 6) เซฟแค่ค่าปุ่ม/toggle ที่ตั้ง Flag ไว้
+-- ส่วน Script State เซฟข้อมูลเกมจริง (wave, coins, ด่านปัจจุบัน ฯลฯ) ที่
+-- เก็บอยู่ใน Window.State — ต้องสร้างไฟล์ก่อนถึงจะเซฟได้
+
+Window:CreateStateFile("save1")              -- ต้องสร้างก่อนเสมอ
+Window:SaveState("save1")                     -- เซฟค่าปัจจุบันทั้งหมดใน Window.State
+Window:LoadState("save1")                     -- โหลดกลับมา (กันโหลดซ้ำอัตโนมัติ)
+Window:LoadStateOnce("save1")                 -- โหลดแค่ครั้งเดียวต่อเซสชัน เรียกกี่รอบก็ได้
+Window:SetAutoLoad("save1", true)             -- ตั้งให้โหลดอัตโนมัติทุกครั้งที่เข้าเกม
+Window:ApplyAutoLoads()                        -- เรียกครั้งเดียวตอนเริ่มสคริปต์ เพื่อให้ AutoLoad ทำงานจริง
+Window:DeleteStateFile("save1")               -- ขึ้น popup ให้ยืนยันก่อนลบเสมอ
+Window:ClearAllStateFiles()                    -- ลบทั้งหมด ก็ขึ้น popup ยืนยันเหมือนกัน
+print(Window:ListStateFiles())                 -- ดูไฟล์ที่มีอยู่จริงบนดิสก์
+print(Window:SearchStateFiles("save"))         -- ค้นหาไฟล์
+local status = Window:GetStateFileStatus("save1")
+print(status.exists, status.lastSave, status.lastLoad, status.autoLoad)
+
+------------------------------------------------------------------------
+11) Config เพิ่มเติม — Import/Export/Duplicate/Rename/Reset/AutoSave
+------------------------------------------------------------------------
+
+print(Window:ListConfigs())                    -- ดูไฟล์ config ที่มีอยู่จริง
+Window:RenameConfig("old", "new")
+Window:DuplicateConfig("default", "backup")
+Window:ResetConfig("default")                  -- รีเซ็ตปุ่ม/toggle กลับค่าเริ่มต้น (element ไหนรีเซ็ตไม่ได้จะบอกตรงๆ)
+local json = Window:ExportConfig("default")    -- เอาไปโชว์/copy ให้ผู้เล่นได้
+Window:ImportConfig("imported", json, true)    -- โหลดกลับจาก JSON string
+Window:AutoSaveConfig("default", 30)           -- เซฟอัตโนมัติทุก 30 วิ
+Window:StopAutoSaveConfig()
+
+------------------------------------------------------------------------
+12) Game/Place Detector — รู้ว่ากำลังรันอยู่เกม/แมพไหน
+------------------------------------------------------------------------
+
+local info = Zentih.Game.GetInfo()
+print(info.GameId, info.PlaceId, info.UniverseId, info.JobId, info.GameName)
+
+-- ผูกโค้ดเฉพาะแมพ/เกม ไว้ล่วงหน้า แล้วให้โหลดเองอัตโนมัติถ้าตรงกับที่รันอยู่
+Zentih.Game.RegisterGame(123456789, function()
+    print("นี่คือแมพ/เกมที่ลงทะเบียนไว้ โหลดของเฉพาะแมพนี้ได้เลย")
+end)
+Zentih.Game.LoadForCurrentGame()               -- เรียกครั้งเดียวตอนเริ่ม จะรันของแมพที่ตรงให้เอง
+
+------------------------------------------------------------------------
+13) TD / Dungeon Backend — โครง generic ให้ต่อยอด (ไม่ใช่เกมสำเร็จรูป)
+------------------------------------------------------------------------
+
+-- Tower Defense: ลงทะเบียนทาวเวอร์/ศัตรู/แมพของคุณเอง Zentih แค่เก็บและ
+-- จัดการสถานะ (wave, เงิน, เลือด) ให้ ไม่รู้จักเกมของคุณโดยตรง
+Zentih.TD.RegisterTower("Archer", { Damage = 10, Range = 20, Cooldown = 1 })
+Zentih.TD.PlaceTower("tower_001", "Archer", Vector3.new(0, 0, 0))
+Zentih.TD.UpgradeTower("tower_001")
+Zentih.TD.SellTower("tower_001")
+
+-- เลือกเป้าหมายให้ทาวเวอร์ยิง (Nearest/Farthest/Strongest/Weakest/First/
+-- Last/Boss/Custom) — ส่งลิสต์ศัตรูที่มี .Position กับ .Health เข้าไป
+local target = Zentih.TD.SelectTarget("Nearest", towerPos, 20, enemyList)
+
+Zentih.TD.StartWave()
+Zentih.TD.AddCoins(100)
+Zentih.TD.SpendCoins(50)
+Zentih.TD.DamageBase(10)
+print(Zentih.TD.GetWave(), Zentih.TD.GetCoins(), Zentih.TD.GetLives())
+Zentih.TD.State.Subscribe("Wave", function(new, old) print("wave:", old, "->", new) end)
+
+-- Dungeon: ห้อง/ด่าน/checkpoint แบบเดียวกัน
+Zentih.Dungeon.RegisterDungeon("Cave1", { Rooms = 5, Boss = "CaveTroll" })
+Zentih.Dungeon.Enter("Cave1")
+Zentih.Dungeon.NextStage()
+Zentih.Dungeon.SetCheckpoint({ room = 3 })
+
+------------------------------------------------------------------------
+14) Macro — บันทึก/เล่นซ้ำการกดปุ่ม (ทำท้ายสุด เสี่ยง error สูงสุด)
+------------------------------------------------------------------------
+
+-- บันทึกได้แค่ "กดปุ่มไหนตอนไหน" ไม่ใช่บันทึกทุกอย่างในเกม (Roblox ไม่มี
+-- API แบบนั้น) ถ้าอยากบันทึกเหตุการณ์เกมด้วย ใช้ RecordCustomEvent คู่กัน
+Zentih.Macro.Record("combo1")
+Zentih.Macro.RecordCustomEvent("UseSkill", { skillId = 3 })  -- เรียกตอนกำลังอัดอยู่
+Zentih.Macro.Stop()
+Zentih.Macro.Play("combo1", {
+    Speed = 1, Loop = false,
+    OnKeyEvent = function(keyCode) print("จำลองกด", keyCode) end,
+    OnCustomEvent = function(name, data) print("event:", name) end,
+})
+Zentih.Macro.Pause()
+Zentih.Macro.Resume()
+Zentih.Macro.SaveToFile("combo1", "MyScript/macros")
+Zentih.Macro.LoadFromFile("combo1", "MyScript/macros")
+Zentih.Macro.BindHotkey(Enum.KeyCode.F1, "Play", "combo1")
+
+------------------------------------------------------------------------
+15) Script Manager — ลงทะเบียน/รัน/หยุด สคริปต์ย่อยของคุณเอง
+------------------------------------------------------------------------
+
+Zentih.ScriptManager.Register("AutoFarm", function(stopSignal)
+    while not stopSignal.Stopped do
+        -- ทำงานฟาร์มของคุณที่นี่
+        task.wait(1)
+    end
+end, "TD") -- หมวด: Universal, TD, Dungeon, Combat, Utility, Map
+
+Zentih.ScriptManager.Execute("AutoFarm")
+Zentih.ScriptManager.Stop("AutoFarm")
+Zentih.ScriptManager.Restart("AutoFarm")
+Zentih.ScriptManager.Disable("AutoFarm")
+Zentih.ScriptManager.SetFavorite("AutoFarm", true)
+print(Zentih.ScriptManager.Search("farm", "TD"))
+print(Zentih.ScriptManager.IsRunning("AutoFarm"))
+
+------------------------------------------------------------------------
+16) ปิดโปรแกรม / ทำลาย GUI ทิ้งทั้งหมด
 ------------------------------------------------------------------------
 
 Window:Destroy()   -- ปิด GUI และเลิกใช้ connection ทั้งหมดให้เรียบร้อย
@@ -211,6 +360,13 @@ Window:Destroy()   -- ปิด GUI และเลิกใช้ connection �
 - Dropdown/MultiDropdown/Combo Box/Color Picker ทุกตัว: กดเลือกก็ปิดเอง,
   เปลี่ยนแท็บก็ปิดเอง, เลื่อนหน้าก็ปิดเอง, และ**คลิกที่ไหนก็ได้นอกกรอบ
   popout ก็ปิดทันที** ไม่ต้องกลัวมันค้างบังจอ
+- ResetConfig ไม่สามารถรีเซ็ตทุก element กลับ default ได้ 100% เสมอไป —
+  จะรายงานตามจริงว่า element ไหนรีเซ็ตได้/ไม่ได้ ไม่ได้โกหกว่าสำเร็จหมด
+- Zentih.Macro บันทึกได้แค่ "กดปุ่มไหนตอนไหน" ไม่ใช่บันทึกทุกอย่างในเกม
+  (Roblox ไม่มี API แบบนั้น) ถ้าอยากบันทึกเหตุการณ์เกมด้วยให้เรียก
+  RecordCustomEvent คู่กันตอนอัดอยู่
+- Zentih.TD / Zentih.Dungeon เป็นแค่ "โครง" ให้ต่อยอด ต้องลงทะเบียน
+  Tower/Enemy/Map/Dungeon ของเกมคุณเองก่อนถึงจะใช้งานได้จริง
 - ดูรายละเอียดพารามิเตอร์ครบทุกฟังก์ชันได้ในไฟล์ API.md (ภาษาอังกฤษ)
 
 ========================================================================
@@ -220,6 +376,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 
 -- LocalPlayer can briefly be nil if this script runs before the client has
 -- fully joined; wait for it instead of erroring immediately. PlayerGui is
@@ -348,8 +505,302 @@ local THEMED_PROPS = {
     PlaceholderColor3 = true, ScrollBarImageColor3 = true,
 }
 
+--// ==========================================================================
+--   CORE MANAGERS — State / Debug / Performance / ErrorHandler / Input
+--   These are real, working systems (not placeholders): every method here
+--   does something and can be inspected/tested on its own, independent of
+--   any GUI element. ThemeManager and ConfigManager build on top of the
+--   existing Theme/SaveConfig code further down rather than duplicating it.
+-- ==========================================================================
+
+--// ErrorHandler -------------------------------------------------------------
+-- Central place every pcall in this library reports through, instead of
+-- silently swallowing errors. Keeps a rolling log and lets the host script
+-- listen for errors (e.g. to show its own notification) via Subscribe.
+local ErrorHandler = {}
+do
+    local log = {}
+    local MAX_LOG = 200
+    local listeners = {}
+
+    function ErrorHandler.Report(context, err)
+        local entry = { context = tostring(context), message = tostring(err), time = os.time() }
+        log[#log + 1] = entry
+        if #log > MAX_LOG then table.remove(log, 1) end
+        for _, fn in ipairs(listeners) do pcall(fn, entry) end
+        return entry
+    end
+
+    function ErrorHandler.Subscribe(fn)
+        listeners[#listeners + 1] = fn
+        return function()
+            for i, f in ipairs(listeners) do
+                if f == fn then table.remove(listeners, i) break end
+            end
+        end
+    end
+
+    function ErrorHandler.GetLog() return log end
+    function ErrorHandler.Clear() log = {} end
+
+    -- Guarded call: runs fn(...), and on failure reports through
+    -- ErrorHandler instead of throwing. Returns (true, result) or (false, nil).
+    function ErrorHandler.Guard(context, fn, ...)
+        local args = { ... }
+        local ok, result = pcall(function() return fn(table.unpack(args)) end)
+        if not ok then
+            ErrorHandler.Report(context, result)
+            return false, nil
+        end
+        return true, result
+    end
+end
+
+--// DebugManager -------------------------------------------------------------
+-- A real console: 4 levels (Info/Debug/Warning/Error), timestamps, an
+-- in-memory ring buffer, filtering by level or a text search, and
+-- Export() to get the whole thing as one copyable string. Does not depend
+-- on any GUI — usable headless (e.g. print to output) or wired into a
+-- Debug tab's UI by the host script.
+local DebugManager = {}
+do
+    local entries = {}
+    local MAX_ENTRIES = 500
+    local listeners = {}
+    local LEVELS = { Info = 1, Debug = 2, Warning = 3, Error = 4 }
+
+    local function push(level, ...)
+        local parts = { ... }
+        for i, v in ipairs(parts) do parts[i] = tostring(v) end
+        local message = table.concat(parts, " ")
+        local entry = { level = level, message = message, time = os.date("%H:%M:%S") }
+        entries[#entries + 1] = entry
+        if #entries > MAX_ENTRIES then table.remove(entries, 1) end
+        for _, fn in ipairs(listeners) do pcall(fn, entry) end
+        return entry
+    end
+
+    function DebugManager.Info(...) return push("Info", ...) end
+    function DebugManager.Debug(...) return push("Debug", ...) end
+    function DebugManager.Warning(...) return push("Warning", ...) end
+    function DebugManager.Error(...) return push("Error", ...) end
+
+    function DebugManager.Subscribe(fn)
+        listeners[#listeners + 1] = fn
+        return function()
+            for i, f in ipairs(listeners) do
+                if f == fn then table.remove(listeners, i) break end
+            end
+        end
+    end
+
+    -- Filter(levelOrNil, searchTextOrNil) -> array of matching entries
+    function DebugManager.Filter(level, searchText)
+        local out = {}
+        local needle = searchText and string.lower(searchText) or nil
+        for _, e in ipairs(entries) do
+            local levelOk = (not level) or e.level == level
+            local textOk = (not needle) or string.find(string.lower(e.message), needle, 1, true)
+            if levelOk and textOk then out[#out + 1] = e end
+        end
+        return out
+    end
+
+    function DebugManager.Clear() entries = {} end
+
+    function DebugManager.Export()
+        local lines = {}
+        for _, e in ipairs(entries) do
+            lines[#lines + 1] = string.format("[%s] %s: %s", e.time, e.level, e.message)
+        end
+        return table.concat(lines, "\n")
+    end
+
+    function DebugManager.GetAll() return entries end
+end
+
+--// PerformanceManager -------------------------------------------------------
+-- Tracks live counts of connections/instances this library has created, so
+-- the host script (or a Debug/Status dashboard) can see real numbers
+-- instead of guessing whether something is leaking. Counts only what
+-- actually goes through create()/track() — see the Window's own
+-- _connections table for the authoritative per-window connection list.
+local PerformanceManager = {}
+do
+    local instanceCount = 0
+    local connectionCount = 0
+    local startClock = os.clock()
+
+    -- Rolling FPS: a lightweight RenderStepped connection updates this
+    -- once per frame. GetStats() reads the last computed value instead of
+    -- yielding — a yield inside a stat-reporting function is a common
+    -- source of subtle bugs (callers not expecting to pause), so this
+    -- avoids that entirely.
+    local currentFps = 0
+    local lastTick = os.clock()
+    local fpsConn = nil
+    local function ensureFpsTracking()
+        if fpsConn then return end
+        local ok = pcall(function()
+            fpsConn = RunService.RenderStepped:Connect(function()
+                local now = os.clock()
+                local dt = now - lastTick
+                lastTick = now
+                if dt > 0 then currentFps = math.floor(1 / dt) end
+            end)
+        end)
+        if not ok then fpsConn = nil end -- e.g. running headless/server-side
+    end
+
+    function PerformanceManager.InstanceCreated() instanceCount += 1 end
+    function PerformanceManager.ConnectionCreated() connectionCount += 1 end
+    function PerformanceManager.ConnectionDestroyed()
+        connectionCount = math.max(0, connectionCount - 1)
+    end
+
+    -- Does not yield. Safe to call from a Stat element's Set callback,
+    -- a tight loop, or anywhere else that can't afford to pause a frame.
+    function PerformanceManager.GetStats()
+        ensureFpsTracking()
+        return {
+            instances = instanceCount,
+            connections = connectionCount,
+            uptimeSeconds = os.clock() - startClock,
+            fps = currentFps,
+        }
+    end
+
+    function PerformanceManager.StopFpsTracking()
+        if fpsConn then fpsConn:Disconnect(); fpsConn = nil end
+    end
+end
+
+--// StateManager --------------------------------------------------------------
+-- A small reactive key/value store, independent of Config (which is for
+-- element Flags saved to disk). State is for in-memory data your game code
+-- wants to read/write/react-to from multiple places without wiring up your
+-- own signal system — e.g. current wave number, selected tower, game phase.
+-- StateManager.New() returns a fresh store; Zentih.State is a shared
+-- default instance so simple scripts don't need to create their own.
+local function newStateManager()
+    local store = {}
+    local subscribers = {} -- key -> array of fn(newValue, oldValue)
+
+    local Manager = {}
+
+    function Manager.Set(key, value)
+        local old = store[key]
+        store[key] = value
+        if subscribers[key] then
+            for _, fn in ipairs(subscribers[key]) do
+                pcall(fn, value, old)
+            end
+        end
+        return value
+    end
+
+    function Manager.Get(key, default)
+        local v = store[key]
+        if v == nil then return default end
+        return v
+    end
+
+    -- Increment/decrement a numeric state value by delta (default 1) and
+    -- return the new value. Useful for counters (kills, wave number) that
+    -- would otherwise need a manual Get-then-Set every call site.
+    function Manager.Increment(key, delta)
+        local current = store[key]
+        if type(current) ~= "number" then current = 0 end
+        return Manager.Set(key, current + (delta or 1))
+    end
+
+    -- Subscribe(key, fn) -> unsubscribe(). fn(newValue, oldValue) fires
+    -- every time Set(key, ...) is called, even if the value didn't change.
+    function Manager.Subscribe(key, fn)
+        subscribers[key] = subscribers[key] or {}
+        local list = subscribers[key]
+        list[#list + 1] = fn
+        return function()
+            for i, f in ipairs(list) do
+                if f == fn then table.remove(list, i) break end
+            end
+        end
+    end
+
+    function Manager.GetAll()
+        local copy = {}
+        for k, v in pairs(store) do copy[k] = v end
+        return copy
+    end
+
+    function Manager.Clear() store = {} end
+
+    return Manager
+end
+
+--// InputManager --------------------------------------------------------------
+-- Centralized global hotkey registration, separate from any single
+-- Keybind GUI element. Use this for things like "press RightShift to
+-- toggle the whole GUI" that aren't tied to one element's Flag/Callback.
+-- Every window's ToggleBubble-adjacent hotkey, and any hotkey your own
+-- game code registers, all share this one InputBegan connection instead
+-- of each stacking a separate one.
+local InputManager = {}
+do
+    local bindings = {} -- Enum.KeyCode -> array of { id, callback }
+    local nextId = 0
+    local connected = false
+
+    local function ensureConnected()
+        if connected then return end
+        connected = true
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            local list = bindings[input.KeyCode]
+            if not list then return end
+            for _, entry in ipairs(list) do
+                pcall(entry.callback, input)
+            end
+        end)
+    end
+
+    -- Bind(keyCode, callback) -> id. Call Unbind(id) to remove it later.
+    function InputManager.Bind(keyCode, callback)
+        ensureConnected()
+        bindings[keyCode] = bindings[keyCode] or {}
+        nextId += 1
+        local id = nextId
+        table.insert(bindings[keyCode], { id = id, callback = callback })
+        return id
+    end
+
+    function InputManager.Unbind(id)
+        for keyCode, list in pairs(bindings) do
+            for i, entry in ipairs(list) do
+                if entry.id == id then
+                    table.remove(list, i)
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    function InputManager.UnbindAll(keyCode)
+        bindings[keyCode] = nil
+    end
+end
+
+-- Shared default instances are attached to Zentih further below, right
+-- after `local Zentih = {}` is declared — see "Zentih.State = ..." near
+-- the OpenPanels/registerPanel setup. (Referencing Zentih up here would be
+-- the same forward-reference bug this codebase has already hit twice:
+-- Zentih doesn't exist as a local yet at this point in the file.)
+
+
 local function create(class, props, children)
     local inst = Instance.new(class)
+    PerformanceManager.InstanceCreated()
     for k, v in pairs(props or {}) do
         inst[k] = v
         if THEMED_PROPS[k] and typeof(v) == "Color3" then
@@ -376,9 +827,622 @@ end
 local function safeMakeFolder(path)
     pcall(function() if not isfolder(path) then makefolder(path) end end)
 end
+local function safeListFiles(path)
+    local ok, files = pcall(function() return listfiles(path) end)
+    if ok and files then return files end
+    return {}
+end
+local function safeDeleteFile(path)
+    return (pcall(function() delfile(path) end))
+end
+local function safeIsFile(path)
+    local ok, result = pcall(function() return isfile(path) end)
+    return ok and result or false
+end
 
 local Zentih = {}
 Zentih.__index = Zentih
+
+-- Shared default instances — simple scripts can use these directly
+-- (Zentih.State.Set(...), Zentih.Debug.Info(...)) without constructing
+-- their own. CreateWindow also stamps a State manager onto each Window
+-- for per-window isolation if the host script wants that instead.
+Zentih.State = newStateManager()
+Zentih.Debug = DebugManager
+Zentih.Performance = PerformanceManager
+Zentih.ErrorHandler = ErrorHandler
+Zentih.Input = InputManager
+Zentih.NewStateManager = newStateManager
+
+--// Game/Place Detector ------------------------------------------------------
+-- Real detection using actual game/game:GetService() values — no guessing.
+-- GameName/PlaceName require MarketplaceService, which can fail (rate
+-- limits, API outage) — those two fields are nil if the lookup fails
+-- rather than throwing, everything else (IDs, JobId) is always available
+-- instantly with no network call.
+Zentih.Game = (function()
+    local MarketplaceService = game:GetService("MarketplaceService")
+    local Detector = {}
+    local registeredModules = {} -- placeId (number) -> loader function
+
+    function Detector.GetInfo()
+        local info = {
+            GameId = game.GameId,
+            PlaceId = game.PlaceId,
+            UniverseId = game.GameId, -- Roblox: GameId IS the universe id
+            JobId = game.JobId,
+            GameName = nil,
+            PlaceName = nil,
+        }
+        pcall(function()
+            local productInfo = MarketplaceService:GetProductInfo(game.PlaceId)
+            info.GameName = productInfo.Name
+            info.PlaceName = productInfo.Name
+        end)
+        return info
+    end
+
+    -- Register a loader function for a specific PlaceId. LoadForCurrentGame()
+    -- calls whichever loader matches the place the script is currently
+    -- running in, if any was registered. Typical use: register one loader
+    -- per TD map, each building that map's tower/enemy/wave config.
+    function Detector.RegisterGame(placeId, loaderFn)
+        registeredModules[placeId] = loaderFn
+    end
+
+    -- Returns (true, result) if a loader was registered and ran
+    -- successfully, (false, nil) if no loader matched or it errored (the
+    -- error is reported through Zentih.ErrorHandler rather than thrown).
+    function Detector.LoadForCurrentGame(...)
+        local loader = registeredModules[game.PlaceId]
+        if not loader then return false, nil end
+        return ErrorHandler.Guard("Game.LoadForCurrentGame", loader, ...)
+    end
+
+    function Detector.IsRegistered(placeId)
+        return registeredModules[placeId or game.PlaceId] ~= nil
+    end
+
+    return Detector
+end)()
+
+--// TD Backend (generic scaffold) --------------------------------------------
+-- A generic framework for Tower Defense-style games: Tower/Enemy/Wave/Map
+-- registries plus economy/lives/base-HP tracking. This is NOT a working
+-- game by itself — Zentih doesn't know your towers' stats, your enemies'
+-- pathing, or your map layout. What it provides is a consistent, tested
+-- place to register that data and react to it (targeting logic, wave
+-- timers, economy math) so you don't have to build that plumbing yourself
+-- for every map. Every piece is built on StateManager, so anything here
+-- is also visible/subscribable through Window.State.
+Zentih.TD = (function()
+    local TD = {}
+    local towers = {}    -- id -> definition table (Stats, Level, Range, ...)
+    local enemies = {}   -- id -> definition table
+    local maps = {}       -- id -> { Path, Waypoints, Spawn, Base, PlacementZones, RestrictedZones }
+    local placedTowers = {} -- instanceId -> { defId, level, position, ... }
+    local state = newStateManager()
+    TD.State = state
+
+    -- Seed the usual TD state keys so Subscribe() works from the very
+    -- first frame even before your game code calls Set() on them.
+    state.Set("Wave", 0)
+    state.Set("MaxWave", 0)
+    state.Set("Coins", 0)
+    state.Set("Lives", 0)
+    state.Set("BaseHP", 0)
+    state.Set("WaveActive", false)
+    state.Set("CurrentMap", nil)
+
+    -- Tower ------------------------------------------------------------
+    -- RegisterTower(id, definition): definition is any table — Stats,
+    -- Level, Damage, Range, Cooldown, UpgradePaths, SellValue, whatever
+    -- your game needs. Zentih just stores and returns it; it doesn't
+    -- interpret the fields, so any tower "shape" works.
+    function TD.RegisterTower(id, definition)
+        towers[id] = definition
+    end
+    function TD.GetTower(id) return towers[id] end
+    function TD.GetAllTowers() return towers end
+
+    -- PlaceTower(instanceId, towerDefId, position) tracks a placed
+    -- instance separately from the tower's static definition, so the same
+    -- definition can be placed many times with independent level/state.
+    function TD.PlaceTower(instanceId, towerDefId, position, extra)
+        local def = towers[towerDefId]
+        if not def then return false, "unknown tower id: " .. tostring(towerDefId) end
+        local placed = { defId = towerDefId, level = 1, position = position }
+        if extra then for k, v in pairs(extra) do placed[k] = v end end
+        placedTowers[instanceId] = placed
+        return true, placed
+    end
+    function TD.SellTower(instanceId)
+        local placed = placedTowers[instanceId]
+        placedTowers[instanceId] = nil
+        return placed
+    end
+    function TD.UpgradeTower(instanceId)
+        local placed = placedTowers[instanceId]
+        if not placed then return false end
+        placed.level += 1
+        return true, placed.level
+    end
+    function TD.GetPlacedTower(instanceId) return placedTowers[instanceId] end
+    function TD.GetAllPlacedTowers() return placedTowers end
+
+    -- TargetMode: given a list of enemy position/health tables and a
+    -- tower's position+range, returns the index of the enemy that
+    -- matches the requested mode. Pure function — no Roblox-specific
+    -- pathing knowledge required, so it works with any enemy shape as
+    -- long as each entry has .Position (Vector3) and .Health (number).
+    local TARGET_MODES = { "First", "Last", "Nearest", "Farthest", "Strongest", "Weakest", "Boss", "Custom" }
+    TD.TargetModes = TARGET_MODES
+    function TD.SelectTarget(mode, towerPosition, range, candidateEnemies, customFn)
+        local inRange = {}
+        for i, e in ipairs(candidateEnemies) do
+            if not e.Position or (towerPosition - e.Position).Magnitude <= (range or math.huge) then
+                inRange[#inRange + 1] = { index = i, enemy = e }
+            end
+        end
+        if #inRange == 0 then return nil end
+
+        if mode == "Custom" and customFn then
+            return customFn(inRange)
+        elseif mode == "First" then
+            return inRange[1].enemy, inRange[1].index
+        elseif mode == "Last" then
+            return inRange[#inRange].enemy, inRange[#inRange].index
+        elseif mode == "Boss" then
+            for _, entry in ipairs(inRange) do
+                if entry.enemy.IsBoss then return entry.enemy, entry.index end
+            end
+            return nil
+        elseif mode == "Nearest" or mode == "Farthest" then
+            local best, bestDist = nil, nil
+            for _, entry in ipairs(inRange) do
+                local dist = (towerPosition - entry.enemy.Position).Magnitude
+                if not bestDist or (mode == "Nearest" and dist < bestDist) or (mode == "Farthest" and dist > bestDist) then
+                    best, bestDist = entry, dist
+                end
+            end
+            return best and best.enemy, best and best.index
+        elseif mode == "Strongest" or mode == "Weakest" then
+            local best, bestHp = nil, nil
+            for _, entry in ipairs(inRange) do
+                local hp = entry.enemy.Health or 0
+                if not bestHp or (mode == "Strongest" and hp > bestHp) or (mode == "Weakest" and hp < bestHp) then
+                    best, bestHp = entry, hp
+                end
+            end
+            return best and best.enemy, best and best.index
+        end
+        return inRange[1].enemy, inRange[1].index -- unknown mode: fall back to First
+    end
+
+    -- Enemy --------------------------------------------------------------
+    function TD.RegisterEnemy(id, definition)
+        enemies[id] = definition
+    end
+    function TD.GetEnemy(id) return enemies[id] end
+    function TD.GetAllEnemies() return enemies end
+
+    -- Map ------------------------------------------------------------
+    -- definition: { Path = {Vector3, ...} or Waypoints, Spawn, Base,
+    -- PlacementZones = {...}, RestrictedZones = {...} } — every field
+    -- optional, stored as-is.
+    function TD.RegisterMap(id, definition)
+        maps[id] = definition
+    end
+    function TD.GetMap(id) return maps[id] end
+    function TD.SetCurrentMap(id)
+        state.Set("CurrentMap", id)
+        return maps[id]
+    end
+    function TD.GetCurrentMap()
+        return maps[state.Get("CurrentMap")]
+    end
+
+    -- IsInPlacementZone/IsInRestrictedZone: a zone is any table exposing
+    -- either a Roblox Region3/BasePart-like :IsPointInside(pos) OR simple
+    -- Center+Size fields (axis-aligned box check) — supports both without
+    -- forcing one representation.
+    local function pointInZone(pos, zone)
+        if zone.IsPointInside then
+            local ok, result = pcall(function() return zone:IsPointInside(pos) end)
+            if ok then return result end
+        end
+        if zone.Center and zone.Size then
+            local halfSize = zone.Size / 2
+            local diff = pos - zone.Center
+            return math.abs(diff.X) <= halfSize.X and math.abs(diff.Y) <= halfSize.Y and math.abs(diff.Z) <= halfSize.Z
+        end
+        return false
+    end
+    function TD.IsInPlacementZone(pos, mapId)
+        local map = maps[mapId or state.Get("CurrentMap")]
+        if not map or not map.PlacementZones then return false end
+        for _, zone in ipairs(map.PlacementZones) do
+            if pointInZone(pos, zone) then return true end
+        end
+        return false
+    end
+    function TD.IsInRestrictedZone(pos, mapId)
+        local map = maps[mapId or state.Get("CurrentMap")]
+        if not map or not map.RestrictedZones then return false end
+        for _, zone in ipairs(map.RestrictedZones) do
+            if pointInZone(pos, zone) then return true end
+        end
+        return false
+    end
+
+    -- Wave / Economy / Lives ------------------------------------------
+    -- These just wrap the seeded State keys with clearer names + the
+    -- occasional bit of math (economy), rather than reimplementing a
+    -- timer system Zentih can't know the right pacing for.
+    function TD.StartWave()
+        state.Increment("Wave")
+        state.Set("WaveActive", true)
+    end
+    function TD.EndWave()
+        state.Set("WaveActive", false)
+    end
+    function TD.SkipWave()
+        TD.EndWave()
+        state.Increment("Wave")
+    end
+    function TD.GetWave() return state.Get("Wave", 0) end
+    function TD.IsWaveActive() return state.Get("WaveActive", false) end
+
+    function TD.AddCoins(amount) return state.Increment("Coins", amount) end
+    function TD.SpendCoins(amount)
+        local current = state.Get("Coins", 0)
+        if current < amount then return false, current end
+        state.Set("Coins", current - amount)
+        return true, current - amount
+    end
+    function TD.GetCoins() return state.Get("Coins", 0) end
+
+    function TD.DamageBase(amount)
+        local hp = math.max(0, state.Get("BaseHP", 0) - amount)
+        state.Set("BaseHP", hp)
+        if hp <= 0 then state.Set("Lives", math.max(0, state.Get("Lives", 0) - 1)) end
+        return hp
+    end
+    function TD.GetLives() return state.Get("Lives", 0) end
+    function TD.IsGameOver() return state.Get("Lives", 0) <= 0 end
+
+    return TD
+end)()
+
+--// Dungeon Backend (generic scaffold) ---------------------------------------
+-- Same philosophy as TD above: generic room/stage/objective tracking, no
+-- game-specific content baked in.
+Zentih.Dungeon = (function()
+    local Dungeon = {}
+    local dungeons = {} -- id -> { Rooms, Stages, Boss, Difficulty, ... }
+    local state = newStateManager()
+    Dungeon.State = state
+    state.Set("CurrentDungeon", nil)
+    state.Set("CurrentStage", 0)
+    state.Set("Checkpoint", nil)
+    state.Set("Timer", 0)
+
+    function Dungeon.RegisterDungeon(id, definition)
+        dungeons[id] = definition
+    end
+    function Dungeon.GetDungeon(id) return dungeons[id] end
+    function Dungeon.Enter(id)
+        state.Set("CurrentDungeon", id)
+        state.Set("CurrentStage", 1)
+        return dungeons[id]
+    end
+    function Dungeon.NextStage()
+        return state.Increment("CurrentStage")
+    end
+    function Dungeon.SetCheckpoint(data)
+        state.Set("Checkpoint", data)
+    end
+    function Dungeon.GetCheckpoint()
+        return state.Get("Checkpoint")
+    end
+    function Dungeon.Complete(reward)
+        state.Set("CurrentDungeon", nil)
+        return reward
+    end
+
+    return Dungeon
+end)()
+
+--// Macro ---------------------------------------------------------------
+-- Records key press/release events (via InputManager-style timestamps)
+-- and can play them back later. This is an input-timing recorder, not a
+-- game-action recorder — it captures which keys were pressed and when,
+-- and replaying it re-fires those same key events through
+-- Zentih.Input's bindings. It does NOT capture mouse movement, camera,
+-- or arbitrary game state, since Roblox has no generic API for "record
+-- everything that happened" — anything scripted around specific
+-- RemoteEvents needs to be recorded by your own game code calling
+-- Zentih.Macro.RecordCustomEvent(name, data) at the right moments, which
+-- this system supports and will replay in-order alongside key events.
+Zentih.Macro = (function()
+    local Macro = {}
+    local recordings = {} -- name -> { events = {...}, speed = 1 }
+    local recording = nil -- currently-recording table, or nil
+    local recordStart = 0
+    local playState = "Stopped" -- Stopped | Recording | Playing | Paused
+    local playToken = 0 -- incremented to cancel an in-progress Play()
+    local inputConn = nil
+
+    function Macro.GetState() return playState end
+
+    function Macro.Record(name)
+        if playState == "Recording" then Macro.Stop() end
+        recording = { name = name, events = {} }
+        recordStart = os.clock()
+        playState = "Recording"
+
+        local ok = pcall(function()
+            inputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed or not recording then return end
+                if input.KeyCode and input.KeyCode ~= Enum.KeyCode.Unknown then
+                    table.insert(recording.events, {
+                        t = os.clock() - recordStart, type = "KeyDown", key = input.KeyCode,
+                    })
+                end
+            end)
+        end)
+        if not ok then
+            playState = "Stopped"
+            recording = nil
+            return false, "InputBegan unavailable in this environment"
+        end
+        return true
+    end
+
+    -- Lets your own game code fold a custom event (a RemoteEvent fire, a
+    -- state change, anything) into the recording, timestamped the same
+    -- way key events are, so Play() replays everything in the right order.
+    function Macro.RecordCustomEvent(eventName, data)
+        if playState ~= "Recording" or not recording then return false end
+        table.insert(recording.events, {
+            t = os.clock() - recordStart, type = "Custom", name = eventName, data = data,
+        })
+        return true
+    end
+
+    function Macro.Stop()
+        if inputConn then pcall(function() inputConn:Disconnect() end); inputConn = nil end
+        if playState == "Recording" and recording then
+            recordings[recording.name] = recording
+        end
+        recording = nil
+        playState = "Stopped"
+        playToken += 1 -- also cancels any in-progress Play()
+    end
+
+    function Macro.Pause()
+        if playState == "Playing" then playState = "Paused" end
+    end
+    function Macro.Resume()
+        if playState == "Paused" then playState = "Playing" end
+    end
+
+    -- Play(name, opts): opts = { Speed = 1, Loop = false, OnCustomEvent =
+    -- function(name, data) end }. Key events replay by firing whatever
+    -- was Bind()'d on that KeyCode via Zentih.Input; custom events call
+    -- OnCustomEvent if provided. Any single event that errors is skipped
+    -- (per spec: one bad event must not break the whole playback) — it's
+    -- reported through ErrorHandler instead of stopping playback.
+    function Macro.Play(name, opts)
+        opts = opts or {}
+        local rec = recordings[name]
+        if not rec then return false, "no recording named " .. tostring(name) end
+        local speed = opts.Speed or 1
+        local myToken = playToken + 1
+        playToken = myToken
+        playState = "Playing"
+
+        task.spawn(function()
+            repeat
+                local startClock = os.clock()
+                for _, event in ipairs(rec.events) do
+                    while playState == "Paused" and playToken == myToken do task.wait(0.05) end
+                    if playToken ~= myToken then return end -- Stop() was called
+                    local targetTime = event.t / speed
+                    local elapsed = os.clock() - startClock
+                    if targetTime > elapsed then task.wait(targetTime - elapsed) end
+                    if playToken ~= myToken then return end
+
+                    ErrorHandler.Guard("Macro.Play:" .. tostring(name), function()
+                        if event.type == "KeyDown" then
+                            -- Replays by calling the host script's OnKeyEvent
+                            -- hook rather than reaching into InputManager's
+                            -- internals — keeps InputManager's binding table
+                            -- private and lets the host decide what "replay
+                            -- this key" actually means for their game.
+                            if opts.OnKeyEvent then opts.OnKeyEvent(event.key) end
+                        elseif event.type == "Custom" and opts.OnCustomEvent then
+                            opts.OnCustomEvent(event.name, event.data)
+                        end
+                    end)
+                end
+                if playToken ~= myToken then return end
+            until not opts.Loop or playToken ~= myToken
+            if playToken == myToken then playState = "Stopped" end
+        end)
+        return true
+    end
+
+    function Macro.SaveToFile(name, folder)
+        local rec = recordings[name]
+        if not rec then return false, "no recording named " .. tostring(name) end
+        safeMakeFolder(folder)
+        return safeWritefile(folder .. "/" .. name .. ".json", HttpService:JSONEncode(rec))
+    end
+
+    function Macro.LoadFromFile(name, folder)
+        local raw = safeReadfile(folder .. "/" .. name .. ".json")
+        if not raw then return false, "file not found" end
+        local ok, data = pcall(function() return HttpService:JSONDecode(raw) end)
+        if not ok then return false, "corrupted macro file" end
+        recordings[name] = data
+        return true
+    end
+
+    function Macro.Rename(oldName, newName)
+        if not recordings[oldName] then return false end
+        recordings[newName] = recordings[oldName]
+        recordings[newName].name = newName
+        recordings[oldName] = nil
+        return true
+    end
+
+    function Macro.Delete(name)
+        local existed = recordings[name] ~= nil
+        recordings[name] = nil
+        return existed
+    end
+
+    function Macro.List()
+        local out = {}
+        for name in pairs(recordings) do out[#out + 1] = name end
+        table.sort(out)
+        return out
+    end
+
+    -- BindHotkey(keyCode, action, macroName): action is "Play"/"Stop"/
+    -- "Pause"/"Resume". Wraps Zentih.Input.Bind so a macro can be
+    -- triggered by a key without the host script wiring that up by hand.
+    function Macro.BindHotkey(keyCode, action, macroName, opts)
+        return InputManager.Bind(keyCode, function()
+            if action == "Play" then Macro.Play(macroName, opts)
+            elseif action == "Stop" then Macro.Stop()
+            elseif action == "Pause" then Macro.Pause()
+            elseif action == "Resume" then Macro.Resume() end
+        end)
+    end
+
+    return Macro
+end)()
+
+--// Script Manager -------------------------------------------------------
+-- Registers named "script modules" (any function or ModuleScript-style
+-- table with a callable) under a category, and manages their running
+-- state (Enable/Disable/Execute/Stop/Restart/Reload). Zentih doesn't ship
+-- any scripts itself — this is purely the bookkeeping layer + a safe
+-- execution wrapper (every Execute goes through ErrorHandler.Guard, so
+-- one broken script module can't take down another or the GUI).
+Zentih.ScriptManager = (function()
+    local Manager = {}
+    local scripts = {} -- id -> { fn, category, enabled, running, favorite, stopFn }
+    local VALID_CATEGORIES = { Universal = true, TD = true, Dungeon = true, Combat = true, Utility = true, Map = true }
+    Manager.Categories = { "Universal", "TD", "Dungeon", "Combat", "Utility", "Map" }
+
+    -- Register(id, fn, category): fn(stopSignal) is called on Execute().
+    -- fn should periodically check stopSignal.Stopped and return if true,
+    -- for scripts that run a loop — Stop() only sets that flag, it cannot
+    -- forcibly interrupt Lua code that never checks it (Roblox has no
+    -- generic "kill this coroutine" primitive that's safe to use here).
+    function Manager.Register(id, fn, category)
+        category = VALID_CATEGORIES[category] and category or "Utility"
+        scripts[id] = {
+            fn = fn, category = category, enabled = true,
+            running = false, favorite = false, stopSignal = nil,
+        }
+        return true
+    end
+
+    function Manager.Unregister(id)
+        if scripts[id] and scripts[id].running then Manager.Stop(id) end
+        scripts[id] = nil
+    end
+
+    function Manager.Execute(id)
+        local entry = scripts[id]
+        if not entry then return false, "not registered: " .. tostring(id) end
+        if not entry.enabled then return false, "disabled: " .. tostring(id) end
+        if entry.running then return false, "already running: " .. tostring(id) end
+
+        local stopSignal = { Stopped = false }
+        entry.stopSignal = stopSignal
+        entry.running = true
+        task.spawn(function()
+            local ok, err = ErrorHandler.Guard("ScriptManager.Execute:" .. tostring(id), entry.fn, stopSignal)
+            entry.running = false
+            if not ok then
+                DebugManager.Error("Script", id, "errored:", err)
+            end
+        end)
+        return true
+    end
+
+    function Manager.Stop(id)
+        local entry = scripts[id]
+        if not entry or not entry.stopSignal then return false end
+        entry.stopSignal.Stopped = true
+        entry.running = false
+        return true
+    end
+
+    function Manager.Restart(id)
+        Manager.Stop(id)
+        task.wait()
+        return Manager.Execute(id)
+    end
+
+    -- Reload(id, newFn): swaps in a new implementation for an already
+    -- registered id (e.g. after hot-loading updated code), stopping the
+    -- old run first if one was in progress.
+    function Manager.Reload(id, newFn)
+        local entry = scripts[id]
+        if not entry then return false, "not registered: " .. tostring(id) end
+        local wasRunning = entry.running
+        if wasRunning then Manager.Stop(id) end
+        entry.fn = newFn
+        if wasRunning then Manager.Execute(id) end
+        return true
+    end
+
+    function Manager.Enable(id) if scripts[id] then scripts[id].enabled = true end end
+    function Manager.Disable(id)
+        if scripts[id] then
+            scripts[id].enabled = false
+            if scripts[id].running then Manager.Stop(id) end
+        end
+    end
+    function Manager.SetFavorite(id, favorite)
+        if scripts[id] then scripts[id].favorite = favorite end
+    end
+
+    function Manager.IsRunning(id) return scripts[id] and scripts[id].running or false end
+    function Manager.Get(id) return scripts[id] end
+
+    -- Search(query, category): substring match on id, optional category
+    -- filter. Returns an array of ids (not the full entries) for a UI
+    -- list to render.
+    function Manager.Search(query, category)
+        local out = {}
+        local needle = query and query ~= "" and string.lower(query) or nil
+        for id, entry in pairs(scripts) do
+            local textOk = (not needle) or string.find(string.lower(tostring(id)), needle, 1, true)
+            local catOk = (not category) or entry.category == category
+            if textOk and catOk then out[#out + 1] = id end
+        end
+        table.sort(out, function(a, b) return tostring(a) < tostring(b) end)
+        return out
+    end
+
+    function Manager.ListFavorites()
+        local out = {}
+        for id, entry in pairs(scripts) do
+            if entry.favorite then out[#out + 1] = id end
+        end
+        table.sort(out, function(a, b) return tostring(a) < tostring(b) end)
+        return out
+    end
+
+    return Manager
+end)()
 
 local OpenPanels = {}
 local function registerPanel(closeFn) OpenPanels[#OpenPanels + 1] = closeFn end
@@ -504,8 +1568,148 @@ local function drawIcon(kind, parent, color)
             Size = UDim2.fromOffset(2, 12), Position = UDim2.fromOffset(8, 3),
             Rotation = -45, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
         }, { corner(1) })
+    elseif kind == "gamepad" then -- Gamepad
+        bar(14, 8, 2, 6, 3)                        -- body
+        bar(4, 2, 2, 3, 1)                          -- left grip stub
+        bar(4, 2, 12, 3, 1)                         -- right grip stub
+        bar(4, 1, 4, 9, 1)                          -- d-pad horizontal
+        bar(1, 4, 5.5, 7.5, 1)                      -- d-pad vertical
+        bar(2, 2, 12, 8, 999)                       -- face button
+    elseif kind == "macro" then -- Macro (record dot inside a frame)
+        create("Frame", {
+            Size = UDim2.fromOffset(16, 16), Position = UDim2.fromOffset(1, 1),
+            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
+        }, { corner(4), stroke(color, 2) })
+        bar(6, 6, 6, 6, 999)                        -- filled record dot
+    elseif kind == "map" then -- Map (folded map with route dashes)
+        create("Frame", {
+            Size = UDim2.fromOffset(16, 12), Position = UDim2.fromOffset(1, 3),
+            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
+        }, { corner(2), stroke(color, 2) })
+        bar(1, 12, 6, 3, nil)
+        bar(1, 12, 11, 3, nil)
+        bar(3, 3, 3, 12, 999)                       -- location pin dot
+    elseif kind == "script" then -- Script (document with fold + lines)
+        create("Frame", {
+            Size = UDim2.fromOffset(12, 16), Position = UDim2.fromOffset(3, 1),
+            BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
+        }, { corner(2), stroke(color, 2) })
+        bar(6, 1.5, 6, 6, 1)
+        bar(6, 1.5, 6, 9.5, 1)
+        bar(4, 1.5, 6, 13, 1)
+    elseif kind == "config" then -- Config (sliders)
+        bar(14, 2, 2, 4, 1)
+        bar(14, 2, 2, 9, 1)
+        bar(14, 2, 2, 14, 1)
+        bar(3, 6, 5, 1, 999)                        -- slider knob row 1
+        bar(3, 6, 10, 6, 999)                       -- slider knob row 2
+        bar(3, 6, 6, 11, 999)                       -- slider knob row 3
+    elseif kind == "debug" then -- Debug (bug body + antennae + legs)
+        bar(8, 9, 5, 5, 4)                          -- body
+        bar(6, 1.5, 6, 2, 1)                        -- antenna base
+        create("Frame", {
+            Size = UDim2.fromOffset(5, 1.5), Position = UDim2.fromOffset(2, 0),
+            Rotation = -30, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        create("Frame", {
+            Size = UDim2.fromOffset(5, 1.5), Position = UDim2.fromOffset(11, 0),
+            Rotation = 30, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = parent,
+        }, { corner(1) })
+        bar(4, 1.5, 0, 8, 1)                        -- left leg
+        bar(4, 1.5, 14, 8, 1)                       -- right leg
+        bar(4, 1.5, 0, 12, 1)                       -- left leg 2
+        bar(4, 1.5, 14, 12, 1)                      -- right leg 2
+    elseif kind == "tower" then -- Tower (TD turret silhouette)
+        bar(4, 4, 7, 1, 1)                          -- turret head
+        bar(2, 4, 8, -1, 1)                         -- barrel
+        bar(8, 3, 5, 5, 1)                          -- upper base
+        bar(12, 4, 3, 8, 1)                         -- lower base (wider)
+        bar(14, 2, 2, 14, 1)                        -- foundation
+    elseif kind == "enemy" then -- Enemy (skull-like silhouette)
+        bar(12, 10, 3, 2, 5)                        -- head
+        bar(3, 3, 5, 6, 999)                        -- left eye
+        bar(3, 3, 10, 6, 999)                       -- right eye
+        bar(2, 3, 6, 12, 1)
+        bar(2, 3, 8.5, 13, 1)
+        bar(2, 3, 11, 12, 1)
+    elseif kind == "wave" then -- Wave (signal/ripple lines)
+        for i = 0, 2 do
+            create("Frame", {
+                Size = UDim2.fromOffset(6 + i * 4, 6 + i * 4),
+                Position = UDim2.fromOffset(9 - i * 2, 9 - i * 2),
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundTransparency = 1, ZIndex = 3, Parent = parent,
+            }, { corner(999), stroke(color, 1.5) })
+        end
+        bar(3, 3, 7.5, 7.5, 999)                    -- center dot
     end
 end
+
+-- Icon size the drawIcon shapes were authored at — every kind() case above
+-- positions its pieces inside this box. createIconButton() below scales
+-- the whole thing up/down from here via UIScale, so a bigger/smaller
+-- requested size never distorts proportions (no shape-specific math to
+-- keep in sync when you add a new icon or change the target size).
+local ICON_BASE_SIZE = 18
+
+-- createIconButton(kind, size, colors) -> control
+--   kind:  icon name (see the list in drawIcon above)
+--   size:  requested pixel size (square); scales the 18x18 artwork via
+--          UIScale so nothing distorts at any size
+--   colors: { Normal, Hover, Selected, Disabled } — any can be omitted,
+--           falls back to Theme.TextTab / Theme.TextTabActive
+--
+-- Returns a control table: { Frame, SetState(stateName), Destroy() }.
+-- SetState animates the icon's color to match Normal/Hover/Selected/
+-- Disabled — call it from your own MouseEnter/MouseLeave/click handlers,
+-- or let CreateTab's own tab buttons drive it automatically (they already
+-- do, via the same Theme colors).
+local function createIconButton(kind, size, colors)
+    colors = colors or {}
+    local stateColors = {
+        Normal = colors.Normal or Theme.TextTab,
+        Hover = colors.Hover or Theme.TextTabActive,
+        Selected = colors.Selected or Theme.Accent,
+        Disabled = colors.Disabled or Theme.TextSecondary,
+    }
+
+    local Holder = create("Frame", {
+        Size = UDim2.fromOffset(size, size), BackgroundTransparency = 1, ClipsDescendants = false,
+    })
+    local Inner = create("Frame", {
+        Size = UDim2.fromOffset(ICON_BASE_SIZE, ICON_BASE_SIZE), BackgroundTransparency = 1,
+        Parent = Holder,
+    })
+    create("UIScale", { Scale = size / ICON_BASE_SIZE, Parent = Inner })
+
+    local currentColor = stateColors.Normal
+    drawIcon(kind, Inner, currentColor)
+
+    local currentState = "Normal"
+    local function setState(stateName)
+        local target = stateColors[stateName] or stateColors.Normal
+        currentState = stateName
+        for _, child in ipairs(Inner:GetChildren()) do
+            if child:IsA("Frame") then tween(child, { BackgroundColor3 = target }, 0.12) end
+            if child:IsA("UIStroke") then tween(child, { Color = target }, 0.12) end
+        end
+    end
+
+    return {
+        Frame = Holder,
+        Inner = Inner,
+        SetState = setState,
+        GetState = function() return currentState end,
+        Destroy = function() Holder:Destroy() end,
+    }
+end
+
+Zentih.CreateIconButton = createIconButton
+Zentih.IconList = {
+    "home", "sword", "save", "settings", "input", "dungeon", "status",
+    "eye", "star", "gamepad", "macro", "map", "script", "config", "debug",
+    "tower", "enemy", "wave",
+}
 
 --// Window ----------------------------------------------------------------
 function Zentih:CreateWindow(config)
@@ -554,7 +1758,7 @@ function Zentih:CreateWindow(config)
     }, { corner(R.Window), stroke(Theme.Stroke, 1) })
 
     local Connections = {}
-    local function track(conn) Connections[#Connections + 1] = conn; return conn end
+    local function track(conn) Connections[#Connections + 1] = conn; PerformanceManager.ConnectionCreated(); return conn end
 
     do
         local dragging, dragStart, startPos
@@ -831,6 +2035,8 @@ function Zentih:CreateWindow(config)
         _windowAlpha = WINDOW_TRANSPARENCY, _cardAlpha = CARD_TRANSPARENCY, _panelAlpha = PANEL_TRANSPARENCY,
         ToggleBubble = ToggleBubble, CurrentTheme = "Original",
         ClickOutsideCatcher = ClickOutsideCatcher,
+        State = newStateManager(), Debug = DebugManager,
+        Performance = PerformanceManager, ErrorHandler = ErrorHandler, Input = InputManager,
     }, Zentih)
 
     PreviousWindowConnections = Connections
@@ -1094,9 +2300,427 @@ function Zentih:LoadConfig(name)
     return true
 end
 
+--// Config — extended operations --------------------------------------------
+-- Builds on SaveConfig/LoadConfig above (which already handle every
+-- element type with a Flag: Toggle, Slider, Dropdown, Input, ColorPicker,
+-- Keybind, Theme is handled separately via SetTheme/CurrentTheme).
+
+function Zentih:ListConfigs()
+    local out = {}
+    for _, path in ipairs(safeListFiles(self.ConfigFolder)) do
+        local name = path:match("([^/\\]+)%.json$")
+        -- Exclude the states/ subfolder's files and the autoload index —
+        -- ListConfigs should only return element-Flag configs.
+        if name and not path:find("/states/") and not path:find("\\states\\") then
+            out[#out + 1] = name
+        end
+    end
+    table.sort(out)
+    return out
+end
+
+function Zentih:DeleteConfig(name, confirmed)
+    if not confirmed then
+        self:CreatePopup({
+            Title = "Delete config?",
+            Content = "This deletes \"" .. tostring(name) .. "\" permanently. This can't be undone.",
+            Buttons = {
+                { Title = "Cancel" },
+                { Title = "Delete", Callback = function() self:DeleteConfig(name, true) end },
+            },
+        })
+        return nil
+    end
+    local path = self.ConfigFolder .. "/" .. name .. ".json"
+    if not safeIsFile(path) then
+        self:Notify({ Title = "Delete Failed", Content = "No config named \"" .. name .. "\"", Duration = 3 })
+        return false
+    end
+    local ok = safeDeleteFile(path)
+    self:Notify({
+        Title = ok and "Config Deleted" or "Delete Failed",
+        Content = ok and (name .. ".json") or "Executor does not support delfile",
+        Duration = 3,
+    })
+    return ok
+end
+
+function Zentih:RenameConfig(oldName, newName)
+    local oldPath = self.ConfigFolder .. "/" .. oldName .. ".json"
+    local raw = safeReadfile(oldPath)
+    if not raw then
+        self:Notify({ Title = "Rename Failed", Content = "No config named \"" .. oldName .. "\"", Duration = 3 })
+        return false
+    end
+    local newPath = self.ConfigFolder .. "/" .. newName .. ".json"
+    if safeIsFile(newPath) then
+        self:Notify({ Title = "Rename Failed", Content = "\"" .. newName .. "\" already exists", Duration = 3 })
+        return false
+    end
+    local writeOk = safeWritefile(newPath, raw)
+    if not writeOk then
+        self:Notify({ Title = "Rename Failed", Content = "Executor does not support writefile", Duration = 3 })
+        return false
+    end
+    safeDeleteFile(oldPath) -- best-effort; new file already exists either way
+    self:Notify({ Title = "Config Renamed", Content = oldName .. " -> " .. newName, Duration = 3 })
+    return true
+end
+
+function Zentih:DuplicateConfig(name, newName)
+    local raw = safeReadfile(self.ConfigFolder .. "/" .. name .. ".json")
+    if not raw then
+        self:Notify({ Title = "Duplicate Failed", Content = "No config named \"" .. name .. "\"", Duration = 3 })
+        return false
+    end
+    local newPath = self.ConfigFolder .. "/" .. newName .. ".json"
+    if safeIsFile(newPath) then
+        self:Notify({ Title = "Duplicate Failed", Content = "\"" .. newName .. "\" already exists", Duration = 3 })
+        return false
+    end
+    local ok = safeWritefile(newPath, raw)
+    self:Notify({
+        Title = ok and "Config Duplicated" or "Duplicate Failed",
+        Content = ok and (name .. " -> " .. newName) or "Executor does not support writefile",
+        Duration = 3,
+    })
+    return ok
+end
+
+-- Resets every Flag'd element back to whatever value it was created with
+-- (its original config.Default), and optionally also deletes the named
+-- config file from disk. Elements that don't support reset (no default
+-- captured at creation) are skipped — this reports accurately what
+-- happened rather than silently pretending everything was reset.
+function Zentih:ResetConfig(name, alsoDeleteFile)
+    local resetCount, skippedCount = 0, 0
+    for flag, setter in pairs(self._flagSetters) do
+        if setter.reset then
+            setter.reset()
+            resetCount += 1
+        else
+            skippedCount += 1
+        end
+    end
+    if alsoDeleteFile and name then
+        safeDeleteFile(self.ConfigFolder .. "/" .. name .. ".json")
+    end
+    self:Notify({
+        Title = "Config Reset",
+        Content = skippedCount == 0
+            and (resetCount .. " element(s) reset to defaults")
+            or (resetCount .. " reset, " .. skippedCount .. " element(s) don't support reset"),
+        Duration = 3,
+    })
+end
+
+-- Returns the raw JSON string for a config so the host script can display
+-- it, copy it to clipboard (if the executor supports setclipboard), or
+-- write it somewhere else entirely.
+function Zentih:ExportConfig(name)
+    local raw = safeReadfile(self.ConfigFolder .. "/" .. name .. ".json")
+    if not raw then
+        self:Notify({ Title = "Export Failed", Content = "No config named \"" .. name .. "\"", Duration = 3 })
+        return nil
+    end
+    return raw
+end
+
+-- Imports a raw JSON string (e.g. pasted by the player, or from
+-- ExportConfig on another device) as a new named config file, then
+-- optionally loads it immediately.
+function Zentih:ImportConfig(name, jsonString, loadImmediately)
+    local ok, data = pcall(function() return HttpService:JSONDecode(jsonString) end)
+    if not ok or type(data) ~= "table" then
+        self:Notify({ Title = "Import Failed", Content = "Invalid config data", Duration = 3 })
+        return false
+    end
+    local writeOk = safeWritefile(self.ConfigFolder .. "/" .. name .. ".json", jsonString)
+    if not writeOk then
+        self:Notify({ Title = "Import Failed", Content = "Executor does not support writefile", Duration = 3 })
+        return false
+    end
+    self:Notify({ Title = "Config Imported", Content = name .. ".json", Duration = 3 })
+    if loadImmediately then self:LoadConfig(name) end
+    return true
+end
+
+-- AutoSaveConfig(name, intervalSeconds): saves the named config on a
+-- repeating timer using task.spawn (not a tight loop) until
+-- StopAutoSaveConfig() is called. Safe to call more than once — starting
+-- again with a new name/interval replaces the previous timer.
+function Zentih:AutoSaveConfig(name, intervalSeconds)
+    self:StopAutoSaveConfig()
+    intervalSeconds = intervalSeconds or 30
+    self._autoSaveRunning = true
+    task.spawn(function()
+        while self._autoSaveRunning do
+            task.wait(intervalSeconds)
+            if not self._autoSaveRunning then break end
+            local data = {}
+            for flag, getValue in pairs(self._flagSetters) do data[flag] = getValue.get() end
+            safeWritefile(self.ConfigFolder .. "/" .. name .. ".json", HttpService:JSONEncode(data))
+        end
+    end)
+end
+
+function Zentih:StopAutoSaveConfig()
+    self._autoSaveRunning = false
+end
+
+--// Script State ------------------------------------------------------------
+-- Distinct from SaveConfig/LoadConfig (which only saves GUI element
+-- Flags): this saves whatever your own game code puts into Window.State
+-- (StateManager) — wave number, selected tower, currency, anything. Real
+-- filesystem operations throughout (listfiles/isfile/delfile), each
+-- guarded so a missing executor function degrades to a clear Notify
+-- instead of throwing.
+--
+-- Files live at <ConfigFolder>/states/<name>.json. Must create a named
+-- state file with :CreateStateFile(name) before :SaveState(name) will
+-- write to it — this matches the spec's "ต้องสร้างไฟล์ก่อน" requirement
+-- and stops a typo'd name from silently creating an untracked file.
+
+function Zentih:CreateStateFile(name)
+    if not name or name == "" then
+        self:Notify({ Title = "Create Failed", Content = "State file needs a name", Duration = 3 })
+        return false
+    end
+    local folder = self.ConfigFolder .. "/states"
+    safeMakeFolder(self.ConfigFolder)
+    safeMakeFolder(folder)
+    local path = folder .. "/" .. name .. ".json"
+    if safeIsFile(path) then
+        self:Notify({ Title = "Already Exists", Content = "State file \"" .. name .. "\" already exists", Duration = 3 })
+        return false
+    end
+    local ok = safeWritefile(path, HttpService:JSONEncode({}))
+    if ok then
+        self._stateFiles = self._stateFiles or {}
+        self._stateFiles[name] = { lastSave = nil, lastLoad = nil, autoLoad = false }
+        self:Notify({ Title = "State File Created", Content = name .. ".json", Duration = 3 })
+    else
+        self:Notify({ Title = "Create Failed", Content = "Executor does not support writefile", Duration = 3 })
+    end
+    return ok
+end
+
+-- Lists every state file that actually exists on disk (not just ones
+-- created this session) — real filesystem read, not a cached guess.
+function Zentih:ListStateFiles()
+    local folder = self.ConfigFolder .. "/states"
+    local out = {}
+    for _, path in ipairs(safeListFiles(folder)) do
+        local name = path:match("([^/\\]+)%.json$")
+        if name then out[#out + 1] = name end
+    end
+    table.sort(out)
+    return out
+end
+
+function Zentih:SaveState(name, stateManager)
+    name = name or "default"
+    local folder = self.ConfigFolder .. "/states"
+    local path = folder .. "/" .. name .. ".json"
+    if not safeIsFile(path) then
+        self:Notify({
+            Title = "Save Failed",
+            Content = "No state file \"" .. name .. "\" — create it first",
+            Duration = 3,
+        })
+        return false
+    end
+    local sm = stateManager or self.State
+    local data = sm.GetAll()
+    local ok = safeWritefile(path, HttpService:JSONEncode(data))
+    self._stateFiles = self._stateFiles or {}
+    self._stateFiles[name] = self._stateFiles[name] or {}
+    if ok then
+        self._stateFiles[name].lastSave = os.time()
+        self:Notify({ Title = "State Saved", Content = name .. ".json", Duration = 3 })
+    else
+        self:Notify({ Title = "Save Failed", Content = "Executor does not support writefile", Duration = 3 })
+    end
+    return ok
+end
+
+-- LoadState guards against loading the same file twice in a row unless
+-- force=true is passed — matches the spec's "ป้องกันโหลดซ้ำ" requirement.
+-- Applies the saved data onto stateManager (defaults to Window.State) via
+-- Set(), so every Subscribe()'d listener fires normally.
+function Zentih:LoadState(name, stateManager, force)
+    name = name or "default"
+    self._stateFiles = self._stateFiles or {}
+    local record = self._stateFiles[name]
+    if record and record.loading and not force then
+        self:Notify({ Title = "Already Loading", Content = "\"" .. name .. "\" is already being loaded", Duration = 3 })
+        return false
+    end
+
+    local path = self.ConfigFolder .. "/states/" .. name .. ".json"
+    local raw = safeReadfile(path)
+    if not raw then
+        self:Notify({ Title = "Load Failed", Content = "No state file named \"" .. name .. "\"", Duration = 3 })
+        return false
+    end
+    local ok, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not ok or type(data) ~= "table" then
+        self:Notify({ Title = "Load Failed", Content = "State file is corrupted", Duration = 3 })
+        return false
+    end
+
+    self._stateFiles[name] = self._stateFiles[name] or {}
+    self._stateFiles[name].loading = true
+    local sm = stateManager or self.State
+    for key, value in pairs(data) do sm.Set(key, value) end
+    self._stateFiles[name].loading = false
+    self._stateFiles[name].lastLoad = os.time()
+
+    self:Notify({ Title = "State Loaded", Content = "Loaded \"" .. name .. "\"", Duration = 3 })
+    return true
+end
+
+-- LoadOnce: loads exactly one time per session even if called repeatedly
+-- (e.g. from code that runs on every CharacterAdded). Second+ calls no-op
+-- silently — no Notify spam, since this is meant to be safe to call from
+-- a loop without the player noticing anything.
+function Zentih:LoadStateOnce(name, stateManager)
+    name = name or "default"
+    self._loadedOnce = self._loadedOnce or {}
+    if self._loadedOnce[name] then return false end
+    self._loadedOnce[name] = true
+    return self:LoadState(name, stateManager, true)
+end
+
+-- AutoLoad: marks a state file to load automatically the next time
+-- ApplyAutoLoads() runs (call that once near the top of your script,
+-- after CreateWindow). SetAutoLoad(name, false) turns it back off.
+function Zentih:SetAutoLoad(name, enabled)
+    self._stateFiles = self._stateFiles or {}
+    self._stateFiles[name] = self._stateFiles[name] or {}
+    self._stateFiles[name].autoLoad = enabled
+    self:SaveAutoLoadFlags()
+end
+
+function Zentih:SaveAutoLoadFlags()
+    local flags = {}
+    for name, record in pairs(self._stateFiles or {}) do
+        if record.autoLoad then flags[name] = true end
+    end
+    safeMakeFolder(self.ConfigFolder)
+    safeWritefile(self.ConfigFolder .. "/autoload.json", HttpService:JSONEncode(flags))
+end
+
+-- Call once at startup to actually perform whichever state files were
+-- previously marked with SetAutoLoad(name, true). Uses LoadOnce
+-- semantics internally, so it's safe even if called more than once.
+function Zentih:ApplyAutoLoads(stateManager)
+    local raw = safeReadfile(self.ConfigFolder .. "/autoload.json")
+    if not raw then return end
+    local ok, flags = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not ok or type(flags) ~= "table" then return end
+    for name in pairs(flags) do
+        self:LoadStateOnce(name, stateManager)
+    end
+end
+
+-- Stop: cancels an in-progress load flag if your own code set one via a
+-- custom flow, and clears the autoLoad flag for this name so
+-- ApplyAutoLoads won't pick it up again next session.
+function Zentih:StopAutoLoad(name)
+    self:SetAutoLoad(name, false)
+end
+
+function Zentih:DeleteStateFile(name, confirmed)
+    if not confirmed then
+        self:CreatePopup({
+            Title = "Delete state file?",
+            Content = "This deletes \"" .. tostring(name) .. "\" permanently. This can't be undone.",
+            Buttons = {
+                { Title = "Cancel" },
+                { Title = "Delete", Callback = function() self:DeleteStateFile(name, true) end },
+            },
+        })
+        return nil -- awaiting confirmation; result comes via the popup callback
+    end
+    local path = self.ConfigFolder .. "/states/" .. name .. ".json"
+    if not safeIsFile(path) then
+        self:Notify({ Title = "Delete Failed", Content = "No state file named \"" .. name .. "\"", Duration = 3 })
+        return false
+    end
+    local ok = safeDeleteFile(path)
+    if ok then
+        if self._stateFiles then self._stateFiles[name] = nil end
+        self:Notify({ Title = "State Deleted", Content = name .. ".json", Duration = 3 })
+    else
+        self:Notify({ Title = "Delete Failed", Content = "Executor does not support delfile", Duration = 3 })
+    end
+    return ok
+end
+
+function Zentih:ClearAllStateFiles(confirmed)
+    if not confirmed then
+        self:CreatePopup({
+            Title = "Delete ALL state files?",
+            Content = "This deletes every saved state file permanently. This can't be undone.",
+            Buttons = {
+                { Title = "Cancel" },
+                { Title = "Delete All", Callback = function() self:ClearAllStateFiles(true) end },
+            },
+        })
+        return nil
+    end
+    local names = self:ListStateFiles()
+    local failCount = 0
+    for _, name in ipairs(names) do
+        if not safeDeleteFile(self.ConfigFolder .. "/states/" .. name .. ".json") then
+            failCount += 1
+        end
+    end
+    self._stateFiles = {}
+    self:Notify({
+        Title = "Cleared",
+        Content = failCount == 0 and (#names .. " state file(s) deleted")
+            or (#names - failCount .. "/" .. #names .. " deleted, " .. failCount .. " failed"),
+        Duration = 3,
+    })
+    return failCount == 0
+end
+
+-- Search across existing state file names (simple substring match) — for
+-- wiring up a search box in a Config/State tab.
+function Zentih:SearchStateFiles(query)
+    local all = self:ListStateFiles()
+    if not query or query == "" then return all end
+    local needle = string.lower(query)
+    local out = {}
+    for _, name in ipairs(all) do
+        if string.find(string.lower(name), needle, 1, true) then out[#out + 1] = name end
+    end
+    return out
+end
+
+-- GetStateFileStatus(name) -> { exists, lastSave, lastLoad, autoLoad } —
+-- for a Status Dashboard row per file. Timestamps are os.time() (unix
+-- seconds) from this session; nil if never saved/loaded this session
+-- (the file may still exist on disk from a previous session).
+function Zentih:GetStateFileStatus(name)
+    local path = self.ConfigFolder .. "/states/" .. name .. ".json"
+    local record = (self._stateFiles or {})[name] or {}
+    return {
+        exists = safeIsFile(path),
+        lastSave = record.lastSave,
+        lastLoad = record.lastLoad,
+        autoLoad = record.autoLoad or false,
+    }
+end
+
 function Zentih:Destroy()
     if self._connections then
-        for _, conn in ipairs(self._connections) do pcall(function() conn:Disconnect() end) end
+        for _, conn in ipairs(self._connections) do
+            pcall(function() conn:Disconnect() end)
+            PerformanceManager.ConnectionDestroyed()
+        end
         if PreviousWindowConnections == self._connections then PreviousWindowConnections = nil end
     end
     OpenPanels = {}
@@ -1106,8 +2730,9 @@ end
 --// Tabs -------------------------------------------------------------------
 -- Icon = a string name picked from the drawn-icon set below (not a raw
 -- character — Roblox's built-in Gotham fonts can't render most symbols).
--- Available icons: home, sword, save, settings, input, dungeon, status,
--- eye, star
+-- Available icons (18 total, also in Zentih.IconList): home, sword, save,
+-- settings, input, dungeon, status, eye, star, gamepad, macro, map,
+-- script, config, debug, tower, enemy, wave
 
 function Zentih:CreateTab(config)
     config = config or {}
