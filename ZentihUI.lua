@@ -27,10 +27,17 @@ local Window = Zentih:CreateWindow({
     Title = "ชื่อสคริปต์ของคุณ",       -- ขึ้นมุมซ้ายบน
     Subtitle = "อะไรก็ได้ เช่น v1.0", -- ตัวเล็กใต้ชื่อ
     ConfigFolder = "MyScript",         -- ชื่อโฟลเดอร์เก็บไฟล์เซฟค่า
+    ToggleIcon = "rbxassetid://123456", -- (ไม่ใส่ก็ได้) รูปในปุ่มลอยวงกลม
+                                         -- ถ้าไม่ใส่ จะใช้ไอคอนตาที่วาดเองแทน
+                                         -- ถ้าใส่ Asset ID ผิด/โหลดไม่ได้ จะ
+                                         -- สลับกลับไปใช้ไอคอนตาให้อัตโนมัติ
 })
 
 พอสร้าง Window แล้ว จะมี "ปุ่มลอยวงกลม" โผล่ที่ขอบขวาจอให้อัตโนมัติ
 กดปุ่มนั้นเพื่อซ่อน/เปิด GUI ทั้งหมด ลากปุ่มไปวางตรงไหนของจอก็ได้
+
+ที่มุมซ้ายล่างของหน้าต่างหลัก มีจุดลาก (เส้นทแยงเล็กๆ) ให้ผู้เล่นกดค้าง
+แล้วลากเพื่อ**ย่อ/ขยายขนาด GUI เองได้เลย** ไม่ต้องเขียนโค้ดเพิ่ม
 
 ------------------------------------------------------------------------
 3) สร้างแท็บ (Tab) — 1 หน้าต่างมีได้หลายแท็บ
@@ -119,9 +126,18 @@ Main:CreateColorPicker({
 local Bar = Main:CreateProgressBar({ Title = "ความคืบหน้า", Max = 100 })
 Bar:Set(72)
 
--- ตัวเลขที่อัปเดตสดๆ (เช่น เงิน, kill count) — โชว์ +/- ตอนค่าเปลี่ยน
+-- ตัวเลขที่อัปเดตสดๆ (เช่น เงิน, kill count, สถานะบอส) — โชว์ +/- ตอนค่าเปลี่ยน
+-- ออกแบบมาให้เรียก :Set() รัวๆ ได้ (เช่นทุกเฟรม หรือทุกครั้งที่ RemoteEvent
+-- ยิงมา) โดยไม่มีวันทำให้สคริปต์คุณ error แม้ element จะถูกลบไปแล้วก็ตาม
 local Kills = Main:CreateStat({ Title = "จำนวนคิล", Default = 0 })
 Kills:Set(5)
+print(Kills:Get())   -- อ่านค่าปัจจุบันกลับมาได้ด้วย
+
+-- ตัวอย่างเอาไปต่อกับสถานะเกมจริงๆ (เช่นบอส/ด่าน ที่เปลี่ยนบ่อย):
+local BossStatus = Main:CreateStat({ Title = "สถานะบอส", Default = "รอ..." })
+game.ReplicatedStorage.BossStatusChanged.OnClientEvent:Connect(function(status)
+    BossStatus:Set(status)  -- เรียกกี่ครั้งก็ได้ ปลอดภัยเสมอ
+end)
 
 ------------------------------------------------------------------------
 5) แจ้งเตือน / ป็อปอัพยืนยัน
@@ -192,6 +208,9 @@ Window:Destroy()   -- ปิด GUI และเลิกใช้ connection �
   ปกติ (ก-ฮ, a-z, ตัวเลข) เท่านั้น
 - ถ้ารันสคริปต์ตัวเองซ้ำหลายรอบ (เช่น ทดสอบไปเรื่อยๆ) ไม่ต้องกังวล —
   ไลบรารีจะเคลียร์ของรอบเก่าให้อัตโนมัติทุกครั้งที่เรียก CreateWindow ใหม่
+- Dropdown/MultiDropdown/Combo Box/Color Picker ทุกตัว: กดเลือกก็ปิดเอง,
+  เปลี่ยนแท็บก็ปิดเอง, เลื่อนหน้าก็ปิดเอง, และ**คลิกที่ไหนก็ได้นอกกรอบ
+  popout ก็ปิดทันที** ไม่ต้องกลัวมันค้างบังจอ
 - ดูรายละเอียดพารามิเตอร์ครบทุกฟังก์ชันได้ในไฟล์ API.md (ภาษาอังกฤษ)
 
 ========================================================================
@@ -560,6 +579,59 @@ function Zentih:CreateWindow(config)
         end))
     end
 
+    --// Resize handle — bottom-left corner grip, drag to resize the whole
+    -- window. Sidebar/Content/Overlay are all sized with a Scale component
+    -- relative to Main, so they follow automatically; only Main.Size needs
+    -- to change here. Min size keeps the sidebar/content usable; max size
+    -- keeps it from growing past a sane bound.
+    local ResizeGrip = create("TextButton", {
+        Text = "", AutoButtonColor = false, BackgroundTransparency = 1,
+        Size = UDim2.fromOffset(22, 22), Position = UDim2.new(0, 0, 1, -22),
+        ZIndex = 5, Parent = Main,
+    })
+    create("Frame", {
+        Size = UDim2.fromOffset(12, 2), Position = UDim2.fromOffset(5, 15),
+        Rotation = 45, BackgroundColor3 = Theme.Stroke, BorderSizePixel = 0,
+        ZIndex = 5, Parent = ResizeGrip,
+    }, { corner(1) })
+    create("Frame", {
+        Size = UDim2.fromOffset(7, 2), Position = UDim2.fromOffset(10, 10),
+        Rotation = 45, BackgroundColor3 = Theme.Stroke, BorderSizePixel = 0,
+        ZIndex = 5, Parent = ResizeGrip,
+    }, { corner(1) })
+    do
+        local MIN_W, MIN_H, MAX_W, MAX_H = 560, 400, 1100, 820
+        local resizing, resizeStart, startSize, startPos2
+        track(ResizeGrip.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                resizing = true
+                resizeStart = input.Position
+                startSize = Main.Size
+                startPos2 = Main.Position
+            end
+        end))
+        track(UserInputService.InputChanged:Connect(function(input)
+            if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - resizeStart
+                -- Dragging the bottom-LEFT corner: moving left/down grows the
+                -- window, so width shrinks with +delta.X and grows with -delta.X;
+                -- the left edge (Position.X) has to shift to keep the right
+                -- edge pinned in place, same idea Windows/macOS use for corner grips.
+                local newW = math.clamp(startSize.X.Offset - delta.X, MIN_W, MAX_W)
+                local newH = math.clamp(startSize.Y.Offset + delta.Y, MIN_H, MAX_H)
+                local actualDeltaW = startSize.X.Offset - newW
+                Main.Size = UDim2.new(startSize.X.Scale, newW, startSize.Y.Scale, newH)
+                Main.Position = UDim2.new(startPos2.X.Scale, startPos2.X.Offset + actualDeltaW,
+                    startPos2.Y.Scale, startPos2.Y.Offset)
+            end
+        end))
+        track(UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                resizing = false
+            end
+        end))
+    end
+
     --// Top bar
     local TopBar = create("Frame", {
         Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = Theme.TopBar,
@@ -661,6 +733,20 @@ function Zentih:CreateWindow(config)
         ClipsDescendants = true, ZIndex = 30, Parent = Main,
     })
 
+    -- Invisible full-window catcher that sits just under any open popout
+    -- (ZIndex 19, below a popout's own 20/21) so a click anywhere outside
+    -- the popout — but still inside the window — closes it immediately,
+    -- without needing to click a specific option or press Escape. Hidden
+    -- whenever no panel is open, shown by showClickCatcher()/hidden by
+    -- hideClickCatcher() which every popout's open/close already calls.
+    local ClickOutsideCatcher = create("TextButton", {
+        Text = "", AutoButtonColor = false, BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 19, Parent = Overlay,
+    })
+    ClickOutsideCatcher.MouseButton1Click:Connect(function()
+        closeAllPanelsExcept(nil)
+    end)
+
     -- Registries so transparency can be adjusted live at runtime via
     -- Window:SetTransparency(...) instead of being baked in at creation.
     local TransparencyRegistry = { Window = {}, Card = {}, Panel = {} }
@@ -676,13 +762,37 @@ function Zentih:CreateWindow(config)
         Text = "", AutoButtonColor = false, Size = UDim2.fromOffset(48, 48),
         Position = UDim2.new(1, -64, 0.5, -24),
         BackgroundColor3 = Theme.Card, BackgroundTransparency = 0,
-        ZIndex = 100, Parent = ScreenGui,
+        ClipsDescendants = true, ZIndex = 100, Parent = ScreenGui,
     }, { corner(999), stroke(Theme.Stroke, 1) })
-    local ToggleIcon = create("Frame", {
-        Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(15, 15),
-        BackgroundTransparency = 1, ZIndex = 100, Parent = ToggleBubble,
-    })
-    drawIcon("eye", ToggleIcon, Theme.TextPrimary)
+    if config.ToggleIcon then
+        -- Custom image (rbxassetid://...) instead of the drawn eye icon.
+        -- Falls back to the drawn icon automatically if the image fails
+        -- to load (e.g. a bad/removed asset ID), so the button is never
+        -- left blank.
+        local ImageIcon = create("ImageLabel", {
+            Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+            Image = config.ToggleIcon, ScaleType = Enum.ScaleType.Fit,
+            ZIndex = 100, Parent = ToggleBubble,
+        })
+        local loadedOk = false
+        pcall(function() loadedOk = ImageIcon.IsLoaded end)
+        task.delay(2, function()
+            if ImageIcon.Parent and not ImageIcon.IsLoaded then
+                local FallbackIcon = create("Frame", {
+                    Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(15, 15),
+                    BackgroundTransparency = 1, ZIndex = 100, Parent = ToggleBubble,
+                })
+                drawIcon("eye", FallbackIcon, Theme.TextPrimary)
+                ImageIcon.Visible = false
+            end
+        end)
+    else
+        local ToggleIcon = create("Frame", {
+            Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(15, 15),
+            BackgroundTransparency = 1, ZIndex = 100, Parent = ToggleBubble,
+        })
+        drawIcon("eye", ToggleIcon, Theme.TextPrimary)
+    end
 
     do
         local dragging, dragStart, startPos, moved
@@ -720,6 +830,7 @@ function Zentih:CreateWindow(config)
         _transparency = TransparencyRegistry,
         _windowAlpha = WINDOW_TRANSPARENCY, _cardAlpha = CARD_TRANSPARENCY, _panelAlpha = PANEL_TRANSPARENCY,
         ToggleBubble = ToggleBubble, CurrentTheme = "Original",
+        ClickOutsideCatcher = ClickOutsideCatcher,
     }, Zentih)
 
     PreviousWindowConnections = Connections
@@ -1236,9 +1347,16 @@ function Zentih:CreateTab(config)
     end
 
     function Tab:CreateStat(config)
-        -- Read-only key/value display. Calling :Set(value) on the returned
-        -- handle briefly flashes the value text to show it changed, and if
-        -- the value is numeric, shows the +/- delta from the previous value.
+        -- Read-only key/value display for live game data (kills, ping,
+        -- currency, a boss/status name, etc). Calling :Set(value) briefly
+        -- flashes the value text to show it changed, and if the value is
+        -- numeric, shows the +/- delta from the previous value.
+        --
+        -- Hardened for real gameplay loops that call :Set() every frame or
+        -- from RemoteEvent callbacks: :Set() never throws even if given an
+        -- odd value (table, function, nil) or called after the tab/window
+        -- was destroyed — it just silently no-ops instead of erroring out
+        -- your update loop. Use :Get() to read the current value back.
         config = config or {}
         local title = config.Title or "Stat"
         local default = config.Default
@@ -1263,20 +1381,28 @@ function Zentih:CreateTab(config)
             Size = UDim2.fromOffset(36, 58), Parent = Card,
         })
         local lastValue = default
-        return {
-            Set = function(_, value)
-                if type(value) == "number" and type(lastValue) == "number" then
-                    local delta = value - lastValue
-                    if delta ~= 0 then
-                        DeltaLabel.Text = (delta > 0 and "+" or "") .. tostring(delta)
-                        DeltaLabel.TextColor3 = delta > 0 and Theme.Success or Theme.Error
-                    end
+
+        local function doSet(value)
+            if not ValueLabel.Parent then return end -- element was destroyed; no-op
+            local displayText = tostring(value)
+            if type(value) == "number" and type(lastValue) == "number" then
+                local delta = value - lastValue
+                if delta ~= 0 then
+                    DeltaLabel.Text = (delta > 0 and "+" or "") .. tostring(delta)
+                    DeltaLabel.TextColor3 = delta > 0 and Theme.Success or Theme.Error
                 end
-                lastValue = value
-                ValueLabel.Text = tostring(value)
-                ValueLabel.TextColor3 = Theme.Accent
-                tween(ValueLabel, { TextColor3 = Theme.TextPrimary }, 0.4)
-            end,
+            else
+                DeltaLabel.Text = ""
+            end
+            lastValue = value
+            ValueLabel.Text = displayText
+            ValueLabel.TextColor3 = Theme.Accent
+            tween(ValueLabel, { TextColor3 = Theme.TextPrimary }, 0.4)
+        end
+
+        return {
+            Set = function(_, value) pcall(doSet, value) end,
+            Get = function(_) return lastValue end,
         }
     end
 
@@ -1452,12 +1578,14 @@ function Zentih:CreateTab(config)
         local function close()
             open = false
             tween(List, { Size = UDim2.fromOffset(POPOUT_W, 0) }, 0.12)
+            self.Window.ClickOutsideCatcher.Visible = false
         end
         local function toggleOpen()
             if not open then closeAllPanelsExcept(close) end
             open = not open
             local target = open and POPOUT_H or 0
             tween(List, { Size = UDim2.fromOffset(POPOUT_W, target) }, 0.12)
+            self.Window.ClickOutsideCatcher.Visible = open
         end
         registerPanel(close)
         local optAccents = {}
@@ -1616,12 +1744,14 @@ function Zentih:CreateTab(config)
         local function close()
             open = false
             tween(List, { Size = UDim2.fromOffset(POPOUT_W, 0) }, 0.12)
+            self.Window.ClickOutsideCatcher.Visible = false
         end
         local function toggleOpen()
             if not open then closeAllPanelsExcept(close) end
             open = not open
             local target = open and POPOUT_H or 0
             tween(List, { Size = UDim2.fromOffset(POPOUT_W, target) }, 0.12)
+            self.Window.ClickOutsideCatcher.Visible = open
         end
         registerPanel(close)
         SelectBtn.MouseButton1Click:Connect(toggleOpen)
@@ -1726,12 +1856,14 @@ function Zentih:CreateTab(config)
         local function close()
             open = false
             tween(List, { Size = UDim2.fromOffset(POPOUT_W, 0) }, 0.12)
+            self.Window.ClickOutsideCatcher.Visible = false
         end
         local function toggleOpen()
             if not open then closeAllPanelsExcept(close) end
             open = not open
             local target = open and POPOUT_H or 0
             tween(List, { Size = UDim2.fromOffset(POPOUT_W, target) }, 0.12)
+            self.Window.ClickOutsideCatcher.Visible = open
         end
         registerPanel(close)
         SelectBtn.MouseButton1Click:Connect(toggleOpen)
@@ -1866,11 +1998,13 @@ function Zentih:CreateTab(config)
         local function closePanel()
             open = false
             tween(Panel, { Size = UDim2.fromOffset(180, 0) }, 0.15)
+            self.Window.ClickOutsideCatcher.Visible = false
         end
         Swatch.MouseButton1Click:Connect(function()
             if not open then closeAllPanelsExcept(closePanel) end
             open = not open
             tween(Panel, { Size = UDim2.fromOffset(180, open and 110 or 0) }, 0.15)
+            self.Window.ClickOutsideCatcher.Visible = open
         end)
         registerPanel(closePanel)
 
